@@ -1,0 +1,266 @@
+// src/components/Sidebar.jsx
+import { useState } from "react";
+import { NavLink } from "react-router-dom";
+import main from "../img/main_logo.png";
+import TopNav from "./TopNav";
+import User_profile from "./User_profile";
+
+const Dot = () => <span className="w-1.5 h-1.5 rounded-full bg-slate-300" />;
+
+const Chevron = ({ open }) => (
+  <svg
+    viewBox="0 0 24 24"
+    className={"w-4 h-4 ml-auto transition-transform " + (open ? "rotate-180" : "")}
+    fill="none"
+    stroke="currentColor"
+  >
+    <path d="m6 9 6 6 6-6" strokeWidth="1.5" />
+  </svg>
+);
+
+const Icon = {
+  User: (p) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...p}>
+      <circle cx="12" cy="8" r="4" strokeWidth="1.5" />
+      <path d="M4 20a8 8 0 0 1 16 0" strokeWidth="1.5" />
+    </svg>
+  ),
+  Home: (p) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...p}>
+      <path d="M3 10.5 12 3l9 7.5" strokeWidth="1.5" />
+      <path d="M5 10v10h14V10" strokeWidth="1.5" />
+    </svg>
+  ),
+  Info: (p) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...p}>
+      <circle cx="12" cy="12" r="9" strokeWidth="1.5" />
+      <path d="M12 10v7m0-11h.01" strokeWidth="1.5" />
+    </svg>
+  ),
+  Layers: (p) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...p}>
+      <path d="M12 3 3 8l9 5 9-5-9-5Z" strokeWidth="1.5" />
+      <path d="M3 12l9 5 9-5" strokeWidth="1.5" />
+      <path d="M3 16l9 5 9-5" strokeWidth="1.5" />
+    </svg>
+  ),
+  Box: (p) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...p}>
+      <path d="M3 7 12 3l9 4-9 4-9-4Z" strokeWidth="1.5" />
+      <path d="M3 7v10l9 4V11L3 7Z" strokeWidth="1.5" />
+      <path d="M21 7v10l-9 4" strokeWidth="1.5" />
+    </svg>
+  ),
+  Mail: (p) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...p}>
+      <rect x="3" y="5" width="18" height="14" rx="2" strokeWidth="1.5" />
+      <path d="m3 7 9 6 9-6" strokeWidth="1.5" />
+    </svg>
+  ),
+  Chat: (p) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...p}>
+      <path d="M7 17v4l4-4h6a4 4 0 0 0 4-4V7a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v6a4 4 0 0 0 4 4Z" strokeWidth="1.5" />
+    </svg>
+  ),
+  Help: (p) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...p}>
+      <circle cx="12" cy="12" r="9" strokeWidth="1.5" />
+      <path d="M9.5 9a2.5 2.5 0 1 1 4.2 1.8c-.7.6-1.2 1.1-1.2 2.2" strokeWidth="1.5" />
+      <path d="M12 17h.01" strokeWidth="1.5" />
+    </svg>
+  ),
+  Dots: (p) => (
+    <svg viewBox="0 0 24 24" fill="currentColor" {...p}>
+      <circle cx="5" cy="12" r="2" />
+      <circle cx="12" cy="12" r="2" />
+      <circle cx="19" cy="12" r="2" />
+    </svg>
+  ),
+};
+
+// Single direct link (no dropdown)
+const singleItems = [
+  { key: "profile", label: "User Profile", to: "/profile/overview", icon: Icon.User },
+];
+
+// Dropdown groups (keep inside Sidebar so pages don’t reference it)
+const grouped = [
+  {
+    key: "home",
+    label: "Home",
+    icon: Icon.Home,
+    children: [
+      { to: "/home/overview", label: "Welcome Banner" },
+      { to: "/home/banners", label: "Add Custom Door Service" },
+      { to: "/home/sections", label: "Our Promises" },
+      { to: "/home/stats", label: "Our Products" },
+    ],
+  },
+  {
+    key: "about",
+    label: "About Us",
+    icon: Icon.Info,
+    children: [
+      { to: "/about/overview", label: "Overview" },
+      { to: "/about/team", label: "Team" },
+      { to: "/about/history", label: "History" },
+      { to: "/about/careers", label: "Careers" },
+    ],
+  },
+  {
+    key: "range",
+    label: "Our Range",
+    icon: Icon.Layers,
+    children: [
+      { to: "/our-range/overview", label: "Overview" },
+      { to: "/our-range/category-a", label: "Category A" },
+      { to: "/our-range/category-b", label: "Category B" },
+      { to: "/our-range/category-c", label: "Category C" },
+    ],
+  },
+  {
+    key: "products",
+    label: "Products",
+    icon: Icon.Box,
+    children: [
+      { to: "/products/overview", label: "Overview" },
+      { to: "/products/new", label: "New" },
+      { to: "/products/all", label: "All Products" },
+      { to: "/products/collections", label: "Collections" },
+    ],
+  },
+  {
+    key: "contact",
+    label: "Contact Us",
+    icon: Icon.Mail,
+    children: [
+      { to: "/contact/overview", label: "Overview" },
+      { to: "/contact/queries", label: "Queries" },
+      { to: "/contact/locations", label: "Locations" },
+      { to: "/contact/settings", label: "Settings" },
+    ],
+  },
+  {
+    key: "testimonial",
+    label: "Testimonial",
+    icon: Icon.Chat,
+    children: [
+      { to: "/testimonial/overview", label: "Overview" },
+      { to: "/testimonial/add", label: "Add" },
+      { to: "/testimonial/list", label: "List" },
+      { to: "/testimonial/settings", label: "Settings" },
+    ],
+  },
+  {
+    key: "faqs",
+    label: "FAQs",
+    icon: Icon.Help,
+    children: [
+      { to: "/faqs/overview", label: "Overview" },
+      { to: "/faqs/add", label: "Add" },
+      { to: "/faqs/list", label: "List" },
+      { to: "/faqs/settings", label: "Settings" },
+    ],
+  },
+  {
+    key: "other",
+    label: "Other",
+    icon: Icon.Dots,
+    children: [
+      { to: "/other/overview", label: "Overview" },
+      { to: "/other/policy", label: "Policy" },
+      { to: "/other/terms", label: "Terms" },
+      { to: "/other/appearance", label: "Appearance" },
+    ],
+  },
+];
+
+export default function Sidebar({ id = "app-sidebar", isOpen = false, onClose }) {
+  const [open, setOpen] = useState(() =>
+    Object.fromEntries(grouped.map((g) => [g.key, false]))
+  );
+
+  const linkClasses = (isActive) =>
+    [
+      "flex items-center gap-3 px-3 py-2 rounded-xl transition-colors",
+      isActive
+        ? "bg-indigo-50 text-indigo-600 font-medium"
+        : "text-slate-600 hover:bg-slate-100 hover:text-slate-900",
+    ].join(" ");
+
+  return (
+    <div>
+      < TopNav />
+      <User_profile />
+      <aside
+        id={id}
+        className={[
+          "fluid inset-y-0 left-0 z-40 w-[290px] bg-white border-r border-slate-200 p-4",
+          "transform transition-transform duration-200",
+          isOpen ? "translate-x-0" : "-translate-x-full",
+          "lg:translate-x-0 lg:static lg:block",
+        ].join(" ")}
+        aria-label="Sidebar"
+      >
+        <div className="flex items-center gap-2 px-2 py-2 mb-2">
+          <img src={main} alt="Food Mart" className="w-[249px] py-[16px] pb-[16px]" />
+        </div>
+
+        <h2 className="text-[#9882b3] text-[12px] w-[249.9px] h-[20px] mb-[16px] font-sans">
+          MENU
+        </h2>
+
+        <nav className="flex flex-col gap-1">
+          {singleItems.map((it) => (
+            <NavLink
+              key={it.key}
+              to={it.to}
+              end
+              className={({ isActive }) => linkClasses(isActive)}
+              aria-current={({ isActive }) => (isActive ? "page" : undefined)}
+              onClick={onClose}
+            >
+              <it.icon className="w-5 h-5" />
+              <span className="truncate">{it.label}</span>
+            </NavLink>
+          ))}
+
+          {grouped.map((group) => (
+            <div key={group.key} className="mt-1 font-sans font-semibold text-[14px]">
+              <button
+                type="button"
+                onClick={() => setOpen((s) => ({ ...s, [group.key]: !s[group.key] }))}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-slate-700 hover:bg-slate-100 transition-colors"
+                aria-expanded={open[group.key]}
+                aria-controls={`sec-${group.key}`}
+              >
+                <group.icon className="w-5 h-5" />
+                <span className="truncate">{group.label}</span>
+                <Chevron open={open[group.key]} />
+              </button>
+
+              <div
+                id={`sec-${group.key}`}
+                className={open[group.key] ? "mt-1 space-y-1 pl-9" : "hidden"}
+              >
+                {group.children.map((child) => (
+                  <NavLink
+                    key={child.to}
+                    to={child.to}
+                    end
+                    className={({ isActive }) => linkClasses(isActive)}
+                    aria-current={({ isActive }) => (isActive ? "page" : undefined)}
+                    onClick={onClose}
+                  >
+                    <Dot />
+                    <span className="truncate">{child.label}</span>
+                  </NavLink>
+                ))}
+              </div>
+            </div>
+          ))}
+        </nav>
+      </aside>
+    </div>
+  );
+}

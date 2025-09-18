@@ -1,0 +1,17 @@
+@import "slick-carousel/slick/slick.css";
+@import "slick-carousel/slick/slick-theme.css";
+.main{
+    font-family: garamond;
+}
+.Fresh{
+    font-family: sans-serif ;
+}
+.fruits h1{
+    font-family: garamond;
+}
+.baked h1{
+    font-family: garamond;
+}
+.sale{
+    letter-spacing: 3px;
+}
