@@ -5,22 +5,42 @@ import App from './App.jsx'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import Admin from './pages/admin/index.jsx'
 import Layout from './pages/admin/Layout.jsx'
-// import { Layout } from 'lucide-react'
-
+import UserProfilePage from './pages/admin/User_profile.jsx'
+import WelcomeBannerPage from './pages/admin/Welcome_banner.jsx'
+import Categorypage from './pages/admin/Admin_category.jsx'
+import Newarrived from './pages/admin/New_arrived_admin.jsx'
 
 const routes = createBrowserRouter([
   {
-    path:"",
+    path: "",
     element: <Layout />,
     children: [
       {
         path: "/",
         element: <App />
       }
-      ,{
-      path: "/admin",
-      element: <Admin />
-    }]
+      , {
+        path: "/admin",
+        element: <Admin />,
+        children: [
+          {
+            path: "",
+            element: <UserProfilePage />
+          },
+          {
+            path: "welcome",
+            element: <WelcomeBannerPage />
+          },
+          {
+            path: "category",
+            element: <Categorypage />
+          },
+          {
+            path:"Promises",
+            element:<Newarrived />
+          }
+        ]
+      }]
   }
 ])
 
