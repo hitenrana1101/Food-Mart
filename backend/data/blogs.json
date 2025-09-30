@@ -1,0 +1,37 @@
+{
+  "title": "Our Recent Blog",
+  "ctaText": "Read All Article",
+  "ctaHref": "#",
+  "cards": [
+    {
+      "id": "a5f1644b-4351-4b0f-9526-efae92f4c2b3",
+      "title": "Top 10 casual look ideas to dress up your kids",
+      "date": "2025-09-30",
+      "tag": "TIPS & TRICKS",
+      "excerpt": "Lorem ipsum dolor sit amet, consectetur adipi elit. Aliquet eleifend viverra enim tincidunt donec quam. A in arcu, hendrerit neque dolor morbi...",
+      "image": "/uploads/img_1759198238126_d8fc99f44a954690a4e9974c86225866.jpg",
+      "visible": true,
+      "order": 1
+    },
+    {
+      "id": "870107ed-825b-4ec6-9ece-230448b51435",
+      "title": "Latest trends of wearing street wears supremely",
+      "date": "2025-09-30",
+      "tag": "TRENDING",
+      "excerpt": "Lorem ipsum dolor sit amet, consectetur adipi elit. Aliquet eleifend viverra enim tincidunt donec quam. A in arcu, hendrerit neque dolor morbi...",
+      "image": "/uploads/img_1759187151064_20b69dae4cd84bbaabdbd65388d90eb2.jpg",
+      "visible": true,
+      "order": 2
+    },
+    {
+      "id": "5536db08-72e6-4e84-8ee1-f0e9b87bdffc",
+      "title": "10 Different Types of comfortable clothes ideas for women",
+      "date": "2025-09-30",
+      "tag": "INSPIRATION",
+      "excerpt": "Lorem ipsum dolor sit amet, consectetur adipi elit. Aliquet eleifend viverra enim tincidunt donec quam. A in arcu, hendrerit neque dolor morbi...",
+      "image": "/uploads/img_1759187170191_ec5bc6a3e17f4c4f8b511d17f2f53079.jpg",
+      "visible": true,
+      "order": 3
+    }
+  ]
+}

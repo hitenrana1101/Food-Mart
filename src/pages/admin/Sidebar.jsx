@@ -8,6 +8,9 @@ import { FaHandshake } from "react-icons/fa6";
 import main from "../img/main_logo.png"
 import User_profile from "../admin/User_profile";
 import WelcomeBannerPage from "../admin/Welcome_banner";
+import ProductsAdmin from "../admin/Trending_admin";
+import AdminJustArrived from "../admin/Just_arrived_admin"
+
 
 const items = [
   { kind: "link", label: "User Profile", to: {User_profile}, icon: <FiUser /> },
@@ -17,20 +20,20 @@ const items = [
       { label: "Welcome Banner", to:"/admin/welcome" },
       { label: "Category", to: "/admin/category" },
       { label: "Our Promises", to: "/admin/promises" },
-      { label: "Our Products", to: "/home/settings" },
+      { label: "Our Products", to: "/admin/products" },
     ]
   },
   
   {
-    label: "About Us", base: "/about", icon: <FiInfo />, subs: [
-      { label: "Overview", to: "/about/overview" },
-      { label: "Team", to: "/about/team" }, 
+    label: "Products", base: "/about", icon: <FiInfo />, subs: [
+      { label: "Best Selling", to: "/admin/selling" },
+      { label: "Just Arrived", to: "/admin/just" }, 
     ]
   },
 
   {
-    label: "Our Range", base: "/range", icon: <FiLayers />, subs: [
-      { label: "Overview", to: "/range/overview" }, 
+    label: "Our Recent Blog", base: "/range", icon: <FiLayers />, subs: [
+      { label: "Overview", to: "/admin/recent" }, 
     ]
   },
   {

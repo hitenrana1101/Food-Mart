@@ -1,0 +1,85 @@
+{
+  "title": "Trending Products",
+  "cards": [
+    {
+      "id": "5a34995d-5312-4653-baf6-cef55b9a17df",
+      "brand": "",
+      "title": "Sunstar Best Lemon juice",
+      "desc": "",
+      "img": "/uploads/img_1759146448807_13eec9978c4049379443b04d25c203b5.png",
+      "visible": true
+    },
+    {
+      "id": "178b910e-0b09-4c2a-b6a4-ddb48f40c9a1",
+      "brand": "",
+      "title": "Sunstar Best Lemon juice",
+      "desc": "",
+      "img": "/uploads/img_1759146497102_0505a3cad23740bd8d80792e45ee8b4f.png",
+      "visible": true
+    },
+    {
+      "id": "e78e1b2e-b166-46de-85c8-3e72374687ae",
+      "brand": "",
+      "title": "Sunstar Best Lemon juice",
+      "desc": "",
+      "img": "/uploads/img_1759146508160_45a3288b67c64d0793501ddf99055bc7.png",
+      "visible": true
+    },
+    {
+      "id": "fa02e07f-6dab-4a28-a613-9a1d5cfcd209",
+      "brand": "",
+      "title": "Sunstar Best Lemon juice",
+      "desc": "JUICES",
+      "img": "/uploads/img_1759146522429_c535c2e61f7e4315b6361b9717a2bb85.png",
+      "visible": true
+    },
+    {
+      "id": "41d486f6-99a3-4a11-8390-c29353869159",
+      "brand": "",
+      "title": "Sunstar Best Lemon juice",
+      "desc": "",
+      "img": "/uploads/img_1759146547573_a65c4442eaa84170b0b83fabbca79246.png",
+      "visible": true
+    },
+    {
+      "id": "1759149368243",
+      "brand": "dsjvds vdscldskn",
+      "title": "Sunstar Best Lemon juice",
+      "desc": "dslkncidsbvc",
+      "img": "/uploads/img_1759146554010_461b3392cf7740878a88824174d10849.png",
+      "visible": true
+    },
+    {
+      "id": "1759149368404",
+      "brand": "",
+      "title": "Sunstar Best Lemon juice",
+      "desc": "",
+      "img": "/uploads/img_1759146561660_63f0facc48b34bdc919fb0f73dda9879.png",
+      "visible": true
+    },
+    {
+      "id": "1759149368557",
+      "brand": "",
+      "title": "Sunstar Best Lemon juice",
+      "desc": "JUICES",
+      "img": "/uploads/img_1759146579915_a6d21a56ecaf487b859f0d3b2c5f9397.png",
+      "visible": true
+    },
+    {
+      "id": "1759149368781",
+      "brand": "",
+      "title": "Sunstar Best Lemon juice",
+      "desc": "",
+      "img": "/uploads/img_1759146589369_177294fa5c6a43e08c9b8f875b82798c.png",
+      "visible": true
+    },
+    {
+      "id": "1759149369469",
+      "brand": "",
+      "title": "Sunstar Best Lemon juice",
+      "desc": "",
+      "img": "/uploads/img_1759146600363_59ca5421f465453cb1de69f8225242d5.png",
+      "visible": true
+    }
+  ]
+}

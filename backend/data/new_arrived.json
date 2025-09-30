@@ -1,0 +1,53 @@
+{
+  "title": "Newly Arrived Brands",
+  "cards": [
+    {
+      "id": "1f837a85-ec90-4632-9212-68f65ef9ff15",
+      "brand": "Amber jar",
+      "title": "Honey best necter",
+      "desc": "you will to get",
+      "img": "/uploads/img_1759197211765_c750f9368df84cc78ae2694d8d27a8e4.jpg",
+      "visible": true
+    },
+    {
+      "id": "ffe10ef8-2c8f-4115-b829-1c4fc29fd547",
+      "brand": "Amber jar",
+      "title": "Honey best necter",
+      "desc": "you will to get",
+      "img": "/uploads/img_1759197220920_364bd3d0cb3f4efc9e85e7421aacd926.jpg",
+      "visible": true
+    },
+    {
+      "id": "92961adf-2e83-46b5-aa4a-5f7b6d1eaa0f",
+      "brand": "Amber jar",
+      "title": "Honey best necter",
+      "desc": "you will to get",
+      "img": "/uploads/img_1759197230924_a5a8fce6251e4a07a01bd22b7d89e7bb.jpg",
+      "visible": true
+    },
+    {
+      "id": "ac6b03d1-a5dc-4875-90cf-b60760c6af88",
+      "brand": "Amber jar",
+      "title": "Honey best necter",
+      "desc": "you will to get",
+      "img": "/uploads/img_1759197240296_c78674f2ed3a42d1b5d47e75d174dd15.jpg",
+      "visible": true
+    },
+    {
+      "id": "4efee495-f810-4fed-9d90-6933e551f120",
+      "brand": "Amber jar",
+      "title": "Honey best necter",
+      "desc": "you will to get",
+      "img": "/uploads/img_1759197257980_12bc5253f56c4c37a5b78edee7fd3fe6.jpg",
+      "visible": true
+    },
+    {
+      "id": "3d555faa-ec8c-41b6-ab97-02b0d01d07e6",
+      "brand": "Amber jar",
+      "title": "Honey best necter",
+      "desc": "you will to get",
+      "img": "/uploads/img_1759197267745_b6031e12630f41e29423c64842bfc08c.jpg",
+      "visible": true
+    }
+  ]
+}

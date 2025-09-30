@@ -9,6 +9,10 @@ import UserProfilePage from './pages/admin/User_profile.jsx'
 import WelcomeBannerPage from './pages/admin/Welcome_banner.jsx'
 import Categorypage from './pages/admin/Admin_category.jsx'
 import Newarrived from './pages/admin/New_arrived_admin.jsx'
+import ProductsAdmin from './pages/admin/Trending_admin.jsx'
+import AdminBestSelling from './pages/admin/Best_products_admin.jsx'
+import AdminJustArrived from './pages/admin/Just_arrived_admin.jsx'
+import AdminRecentBlog from './pages/admin/Recent_blog_admin.jsx'
 
 const routes = createBrowserRouter([
   {
@@ -38,6 +42,22 @@ const routes = createBrowserRouter([
           {
             path:"Promises",
             element:<Newarrived />
+          },
+          {
+            path:"Products",
+            element:<ProductsAdmin />
+          },
+          {
+            path:"selling",
+            element:<AdminBestSelling/>
+          },
+          {
+            path:"just",
+            element:<AdminJustArrived/>
+          },
+          {
+            path:"recent",
+            element:<AdminRecentBlog/>
           }
         ]
       }]

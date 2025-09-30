@@ -1,0 +1,69 @@
+{
+  "title": "Best selling products",
+  "cards": [
+    {
+      "id": "adfce56b-7aea-478b-9d32-8e19bb53a1e7",
+      "brand": "",
+      "title": "Sunstar Fresh lemon juice",
+      "desc": "",
+      "img": "/uploads/img_1759150922799_a063fd8afd7a49d08ba08e0eb63b737e.png",
+      "visible": true
+    },
+    {
+      "id": "5ea2682f-20fb-44eb-9900-7c1796a7de1a",
+      "brand": "",
+      "title": "Sunstar Fresh lemon juice",
+      "desc": "",
+      "img": "/uploads/img_1759150938557_fa4837fc5a0746b7bd8e639c0f46cdec.png",
+      "visible": true
+    },
+    {
+      "id": "71b6c033-5ce5-4bf9-a7ac-3c2bae4c7e03",
+      "brand": "",
+      "title": "Sunstar Fresh lemon juice",
+      "desc": "",
+      "img": "/uploads/img_1759150965466_a11db5992ef844afae8b6385925c9929.png",
+      "visible": true
+    },
+    {
+      "id": "dbebf71e-aa5e-423b-91e2-b63bb8f12362",
+      "brand": "",
+      "title": "Sunstar Fresh lemon juice",
+      "desc": "",
+      "img": "/uploads/img_1759150979232_01089c2c3d9242cdb727a768c697061c.png",
+      "visible": true
+    },
+    {
+      "id": "dc0095d0-49d2-4162-b190-18b41259b42a",
+      "brand": "",
+      "title": "Sunstar Fresh lemon juice",
+      "desc": "",
+      "img": "/uploads/img_1759150997183_352b316717604c0c917c381aef2b1f09.png",
+      "visible": true
+    },
+    {
+      "id": "c7921d6d-9813-4c83-b58d-3a732bfa7d26",
+      "brand": "",
+      "title": "Sunstar Fresh lemon juice",
+      "desc": "",
+      "img": "/uploads/img_1759151160768_27ad3cb11aec48abb5544aa9baff8f36.png",
+      "visible": true
+    },
+    {
+      "id": "7f528878-56eb-44e8-8bdf-1c3fa60d5323",
+      "brand": "",
+      "title": "Sunstar Fresh lemon juice",
+      "desc": "",
+      "img": "/uploads/img_1759151302760_21f70db006964051980dcf665f49aea5.png",
+      "visible": true
+    },
+    {
+      "id": "455700c6-3c9c-4672-b3a7-38e903bd5837",
+      "brand": "",
+      "title": "Sunstar Fresh lemon juice",
+      "desc": "",
+      "img": "/uploads/img_1759151308663_4e341906ac8a4935948dac27d6297ed2.png",
+      "visible": true
+    }
+  ]
+}
