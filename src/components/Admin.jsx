@@ -11,6 +11,11 @@
 //   const isAdmin = user && roles?.includes('admin');
 //   return isAdmin ? children : <Navigate to="/" replace />;
 // };
+// export const metadata = {
+//   title: "Food Mart Admin ",
+//   description: "Explore our top IT services and projects.",
+// };
+ 
 
 export default function AppRoutes() {
   return (

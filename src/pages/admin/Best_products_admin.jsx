@@ -16,7 +16,9 @@ const blank = (cat = "FRUITS & VEGES") => ({
   unit: "1 UNIT",
   rating: 4.5,
   discount: 15,
+  qty: 0,
   order: 9999,
+  orders: 0,
 });
 
 function broadcastRefresh() {
@@ -38,7 +40,6 @@ export default function AdminBestSelling() {
   const [msg, setMsg] = useState({ ok: "", err: "" });
   const [filter, setFilter] = useState("ALL");
 
-  // Load existing
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -60,7 +61,9 @@ export default function AdminBestSelling() {
             unit: c.unit || "1 UNIT",
             rating: Number.isFinite(Number(c.rating)) ? Number(c.rating) : 4.5,
             discount: Number.isFinite(Number(c.discount)) ? Number(c.discount) : 15,
+            qty: Number.isFinite(Number(c.qty)) ? Number(c.qty) : 0,
             order: Number.isFinite(Number(c.order)) ? Number(c.order) : i + 1,
+            orders: Number.isFinite(Number(c.orders)) ? Number(c.orders) : 0,
           }))
         );
       } catch (e) {
@@ -74,8 +77,7 @@ export default function AdminBestSelling() {
     return () => { alive = false; };
   }, []);
 
-  const setRow = (id, patch) =>
-    setRows((arr) => arr.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  const setRow = (id, patch) => setRows((arr) => arr.map((r) => (r.id === id ? { ...r, ...patch } : r)));
 
   const add = () =>
     setRows((arr) => {
@@ -123,7 +125,9 @@ export default function AdminBestSelling() {
         unit: String(r.unit || "1 UNIT"),
         rating: Number.isFinite(Number(r.rating)) ? Number(r.rating) : 4.5,
         discount: Number.isFinite(Number(r.discount)) ? Number(r.discount) : 15,
+        qty: Number.isFinite(Number(r.qty)) ? Number(r.qty) : 0,
         order: Number.isFinite(Number(r.order)) ? Number(r.order) : i + 1,
+        orders: Number.isFinite(Number(r.orders)) ? Number(r.orders) : 0,
       }));
       const payload = { title: String(title || "Best selling products").trim(), cards: cleaned };
       const res = await fetch("/api/best-selling", {
@@ -143,10 +147,42 @@ export default function AdminBestSelling() {
     }
   };
 
-  const filtered = useMemo(
-    () => (filter === "ALL" ? rows : rows.filter((r) => r.category === filter)),
-    [rows, filter]
-  );
+  const orderPlus = async (id, qty = 1) => {
+    try {
+      const res = await fetch("/api/best-selling/order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, qty }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data?.error) throw new Error(data?.error || `Order failed ${res.status}`);
+      setRows((arr) => arr.map((r) => (r.id === id ? { ...r, orders: data.orders } : r)));
+    } catch (e) {
+      alert(e?.message || "Order failed");
+    }
+  };
+
+  const previewOrderOne = async (id) => {
+    const prod = rows.find((x) => x.id === id);
+    const stock = Number(prod?.qty || 0);
+    if (stock <= 0) return alert("Out of Stock");
+    try {
+      const res = await fetch("/api/best-selling/order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, qty: 1 }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data?.error) throw new Error(data?.error || `Order failed ${res.status}`);
+      setRows((arr) =>
+        arr.map((r) => (r.id === id ? { ...r, qty: Math.max(0, (Number(r.qty) || 0) - 1), orders: Number(data.orders) || r.orders } : r))
+      );
+    } catch (e) {
+      alert(e?.message || "Order failed");
+    }
+  };
+
+  const filtered = useMemo(() => (filter === "ALL" ? rows : rows.filter((r) => r.category === filter)), [rows, filter]);
 
   const counts = useMemo(() => {
     const all = rows.length;
@@ -157,69 +193,40 @@ export default function AdminBestSelling() {
 
   return (
     <main className="mx-auto max-w-[1472px] px-3 sm:px-4 py-5">
-      {/* Header */}
+      <title>Food Mart Best_selling</title>
       <div className="mb-3 flex items-center justify-between">
         <h1 className="text-[15px] font-semibold">{title}</h1>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={add}
-            disabled={rows.length >= CAP}
-            className="h-8 rounded border px-2 text-xs hover:bg-neutral-50 disabled:opacity-50"
-            title={rows.length >= CAP ? "Max 8 items" : "Add item"}
-          >
+          <button type="button" onClick={add} disabled={rows.length >= CAP} className="h-8 rounded border px-2 text-xs hover:bg-neutral-50 disabled:opacity-50" title={rows.length >= CAP ? "Max 8 items" : "Add item"}>
             Add ({rows.length}/{CAP})
           </button>
-          <button
-            type="button"
-            onClick={save}
-            disabled={saving}
-            className="h-8 rounded bg-emerald-600 px-2 text-xs text-white hover:bg-emerald-700 disabled:opacity-60"
-          >
+          <button type="button" onClick={save} disabled={saving} className="h-8 rounded bg-emerald-600 px-2 text-xs text-white hover:bg-emerald-700 disabled:opacity-60">
             {saving ? "Saving..." : "Save"}
           </button>
         </div>
       </div>
 
-      {/* Filter navbar */}
       <div className="mb-3 flex items-center gap-4 text-xs">
         {["ALL", ...CATS].map((t) => (
-          <button
-            key={t}
-            onClick={() => setFilter(t)}
-            className={`pb-1 border-b ${
-              filter === t ? "border-amber-300 text-neutral-900" : "border-transparent text-neutral-500 hover:text-neutral-800"
-            }`}
-            type="button"
-          >
-            {t} <span className="ml-1 text-[10px] text-neutral-400">
-              {t === "ALL" ? counts.ALL : counts[t]}
-            </span>
+          <button key={t} onClick={() => setFilter(t)} className={`pb-1 border-b ${filter === t ? "border-amber-300 text-neutral-900" : "border-transparent text-neutral-500 hover:text-neutral-800"}`} type="button">
+            {t} <span className="ml-1 text-[10px] text-neutral-400">{t === "ALL" ? counts.ALL : counts[t]}</span>
           </button>
         ))}
       </div>
 
-      {/* List editor */}
       {loading ? (
         <div className="text-xs text-neutral-600">Loading...</div>
       ) : rows.length === 0 ? (
-        <div className="grid place-items-center rounded border border-dashed border-neutral-300 py-10 text-xs text-neutral-600">
-          No items — click Add
-        </div>
+        <div className="grid place-items-center rounded border border-dashed border-neutral-300 py-10 text-xs text-neutral-600">No items — click Add</div>
       ) : (
         <ul className="space-y-3">
           {filtered.map((r, idx) => (
             <li key={r.id} className="rounded border border-neutral-200 bg-white p-2">
               <div className="flex items-start gap-2">
-                {/* Image column */}
                 <div className="w-24 shrink-0">
                   <div className="aspect-[4/3] w-full overflow-hidden rounded bg-neutral-50 ring-1 ring-neutral-200 grid place-items-center">
                     {/* eslint-disable-next-line */}
-                    {r.img ? (
-                      <img src={r.img} alt={r.title || "img"} className="h-full w-full object-contain" />
-                    ) : (
-                      <div className="text-[10px] text-neutral-400">No image</div>
-                    )}
+                    {r.img ? <img src={r.img} alt={r.title || "img"} className="h-full w-full object-contain" /> : <div className="text-[10px] text-neutral-400">No image</div>}
                   </div>
                   <div className="mt-1 grid grid-cols-1 gap-1">
                     <input
@@ -238,113 +245,49 @@ export default function AdminBestSelling() {
                       }}
                       className="block w-full text-[10px]"
                     />
-                    <input
-                      type="url"
-                      placeholder="/uploads/..."
-                      value={r.img}
-                      onChange={(e) => setRow(r.id, { img: e.target.value })}
-                      className="rounded border px-2 py-1 text-[11px]"
-                    />
+                    <input type="url" placeholder="/uploads/..." value={r.img} onChange={(e) => setRow(r.id, { img: e.target.value })} className="rounded border px-2 py-1 text-[11px]" />
                   </div>
                 </div>
 
-                {/* Fields */}
                 <div className="grid flex-1 grid-cols-1 gap-2">
                   <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_auto] gap-2">
-                    <input
-                      type="text"
-                      placeholder="Brand"
-                      value={r.brand}
-                      onChange={(e) => setRow(r.id, { brand: e.target.value })}
-                      className="rounded border px-2 py-1 text-xs"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Title"
-                      value={r.title}
-                      onChange={(e) => setRow(r.id, { title: e.target.value })}
-                      className="rounded border px-2 py-1 text-xs"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Subtitle"
-                      value={r.desc}
-                      onChange={(e) => setRow(r.id, { desc: e.target.value })}
-                      className="rounded border px-2 py-1 text-xs"
-                    />
+                    <input type="text" placeholder="Brand" value={r.brand} onChange={(e) => setRow(r.id, { brand: e.target.value })} className="rounded border px-2 py-1 text-xs" />
+                    <input type="text" placeholder="Title" value={r.title} onChange={(e) => setRow(r.id, { title: e.target.value })} className="rounded border px-2 py-1 text-xs" />
+                    <input type="text" placeholder="Subtitle" value={r.desc} onChange={(e) => setRow(r.id, { desc: e.target.value })} className="rounded border px-2 py-1 text-xs" />
                     <label className="flex items-center justify-end gap-1 text-[11px]">
-                      <input
-                        type="checkbox"
-                        checked={r.visible}
-                        onChange={(e) => setRow(r.id, { visible: e.target.checked })}
-                      />
+                      <input type="checkbox" checked={r.visible} onChange={(e) => setRow(r.id, { visible: e.target.checked })} />
                       Visible
                     </label>
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-[160px_repeat(4,minmax(0,1fr))_auto_auto_auto] gap-2">
-                    <select
-                      value={r.category}
-                      onChange={(e) => setRow(r.id, { category: e.target.value })}
-                      className="rounded border px-2 py-1 text-xs"
-                    >
+                  <div className="grid grid-cols-2 sm:grid-cols-[160px_repeat(6,minmax(0,1fr))_auto_auto_auto] gap-2">
+                    <select value={r.category} onChange={(e) => setRow(r.id, { category: e.target.value })} className="rounded border px-2 py-1 text-xs">
                       {CATS.map((c) => (
                         <option key={c}>{c}</option>
                       ))}
                     </select>
-                    <input
-                      type="number"
-                      step="0.01"
-                      placeholder="Price"
-                      value={r.price}
-                      onChange={(e) => setRow(r.id, { price: Number(e.target.value) })}
-                      className="rounded border px-2 py-1 text-xs"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Unit"
-                      value={r.unit}
-                      onChange={(e) => setRow(r.id, { unit: e.target.value })}
-                      className="rounded border px-2 py-1 text-xs"
-                    />
-                    <input
-                      type="number"
-                      step="0.1"
-                      placeholder="Rating"
-                      value={r.rating}
-                      onChange={(e) => setRow(r.id, { rating: Number(e.target.value) })}
-                      className="rounded border px-2 py-1 text-xs"
-                    />
-                    <input
-                      type="number"
-                      placeholder="Discount"
-                      value={r.discount}
-                      onChange={(e) => setRow(r.id, { discount: Number(e.target.value) })}
-                      className="rounded border px-2 py-1 text-xs"
-                    />
+                    <input type="number" step="0.01" placeholder="Price" value={r.price} onChange={(e) => setRow(r.id, { price: Number(e.target.value) })} className="rounded border px-2 py-1 text-xs" />
+                    <input type="text" placeholder="Unit" value={r.unit} onChange={(e) => setRow(r.id, { unit: e.target.value })} className="rounded border px-2 py-1 text-xs" />
+                    <input type="number" step="0.1" placeholder="Rating" value={r.rating} onChange={(e) => setRow(r.id, { rating: Number(e.target.value) })} className="rounded border px-2 py-1 text-xs" />
+                    <input type="number" placeholder="Discount" value={r.discount} onChange={(e) => setRow(r.id, { discount: Number(e.target.value) })} className="rounded border px-2 py-1 text-xs" />
+                    <input type="number" placeholder="Stock qty" value={r.qty} onChange={(e) => setRow(r.id, { qty: Number(e.target.value) })} className="rounded border px-2 py-1 text-xs" />
+
                     <div className="flex items-center justify-end gap-1">
-                      <button
-                        type="button"
-                        onClick={() => move(r.id, "up")}
-                        className="rounded border px-2 py-1 text-[11px] hover:bg-neutral-50"
-                        title="Up"
-                      >
+                      <span className="text-[11px] text-neutral-500">Orders:</span>
+                      <span className="text-[11px] font-semibold">{r.orders ?? 0}</span>
+                      <button type="button" onClick={() => orderPlus(r.id, 1)} className="rounded border px-2 py-1 text-[11px] hover:bg-neutral-50" title="Add 1 order">
+                        +1
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-1">
+                      <button type="button" onClick={() => move(r.id, "up")} className="rounded border px-2 py-1 text-[11px] hover:bg-neutral-50" title="Up">
                         ↑
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => move(r.id, "down")}
-                        className="rounded border px-2 py-1 text-[11px] hover:bg-neutral-50"
-                        title="Down"
-                      >
+                      <button type="button" onClick={() => move(r.id, "down")} className="rounded border px-2 py-1 text-[11px] hover:bg-neutral-50" title="Down">
                         ↓
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => delRow(r.id)}
-                        className="rounded border border-rose-300 px-2 py-1 text-[11px] text-rose-700 hover:bg-rose-50"
-                        title="Delete"
-                      >
+                      <button type="button" onClick={() => delRow(r.id)} className="rounded border border-rose-300 px-2 py-1 text-[11px] text-rose-700 hover:bg-rose-50" title="Delete">
                         Del
                       </button>
                     </div>
@@ -360,7 +303,6 @@ export default function AdminBestSelling() {
         </ul>
       )}
 
-      {/* Live Preview (same hover behavior as frontend) */}
       <div className="mt-6">
         <h2 className="mb-2 text-[12px] font-semibold text-neutral-800">Preview</h2>
         <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
@@ -370,9 +312,10 @@ export default function AdminBestSelling() {
             .map((p) => (
               <article key={p.id} className="relative rounded-2xl border border-neutral-200 bg-white shadow-sm transition hover:shadow-2xl hover:-translate-y-0.5 duration-200">
                 {!!p.discount && (
-                  <span className="absolute left-4 top-4 rounded-md bg-green-100 text-green-700 text-xs font-semibold px-2 py-1">
-                    -{p.discount}%
-                  </span>
+                  <span className="absolute left-4 top-4 rounded-md bg-green-100 text-green-700 text-xs font-semibold px-2 py-1">-{p.discount}%</span>
+                )}
+                {Number(p.qty) <= 0 && (
+                  <span className="absolute left-4 top-4 rounded-md bg-rose-100 text-rose-700 text-xs font-semibold px-2 py-1">Out of Stock</span>
                 )}
                 <button type="button" className="absolute right-4 top-4 h-9 w-9 grid place-items-center rounded-full bg-white/90 ring-1 ring-neutral-200">
                   <span className="text-xs">♡</span>
@@ -380,11 +323,7 @@ export default function AdminBestSelling() {
                 <div className="p-4">
                   <div className="aspect-[4/3] rounded-xl bg-neutral-50 overflow-hidden grid place-items-center">
                     {/* eslint-disable-next-line */}
-                    {p.img ? (
-                      <img src={p.img} alt={p.title} className="h-full w-full object-contain" />
-                    ) : (
-                      <div className="text-xs text-neutral-400">No image</div>
-                    )}
+                    {p.img ? <img src={p.img} alt={p.title} className="h-full w-full object-contain" /> : <div className="text-xs text-neutral-400">No image</div>}
                   </div>
                 </div>
                 <div className="px-4 pb-4">
@@ -397,11 +336,17 @@ export default function AdminBestSelling() {
                   </div>
                   <h2 className="mt-2 line-clamp-2 text-[15px] font-semibold text-neutral-900">{p.title || p.brand || "Untitled"}</h2>
                   <div className="mt-2 text-lg font-semibold text-neutral-900">${Number(p.price).toFixed(2)}</div>
+                  <div className="mt-1 text-[12px] text-neutral-500">{Number(p.qty) > 0 ? `${p.qty} in stock` : "Out of Stock"}</div>
+                  <button type="button" onClick={() => previewOrderOne(p.id)} disabled={!Number.isFinite(Number(p.qty)) || Number(p.qty) <= 0} className="mt-2 h-8 w-full rounded-md bg-emerald-600 px-3 text-[12px] font-medium text-white hover:bg-emerald-700 disabled:opacity-60">
+                    Order
+                  </button>
                 </div>
               </article>
             ))}
         </div>
       </div>
+
+      {(msg.ok || msg.err) && <div className={`mt-3 text-xs ${msg.ok ? "text-emerald-700" : "text-rose-700"}`}>{msg.ok || msg.err}</div>}
     </main>
   );
 }

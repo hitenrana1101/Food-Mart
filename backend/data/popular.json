@@ -7,7 +7,12 @@
       "title": "",
       "desc": "",
       "img": "/uploads/img_1759198272986_3ae4a769a136450b9a0dd5108be01356.png",
-      "visible": true
+      "visible": true,
+      "unit": "1 UNIT",
+      "price": 18.0,
+      "rating": 4.5,
+      "discount": 0,
+      "order": 1
     },
     {
       "id": "1ec5ddda-a067-4f5a-aab9-776798cc3f9a",
@@ -15,7 +20,12 @@
       "title": "",
       "desc": "",
       "img": "/uploads/img_1759156974466_697030974c574afba2c31cb5f74834ca.png",
-      "visible": true
+      "visible": true,
+      "unit": "1 UNIT",
+      "price": 18.0,
+      "rating": 4.5,
+      "discount": 0,
+      "order": 2
     },
     {
       "id": "68e52dbc-4f0c-481f-8971-eb06d1c5c5e8",
@@ -23,7 +33,12 @@
       "title": "",
       "desc": "",
       "img": "/uploads/img_1759156983124_27f9d1bf62024014a8ab5b16b9ca0e27.png",
-      "visible": true
+      "visible": true,
+      "unit": "1 UNIT",
+      "price": 18.0,
+      "rating": 4.5,
+      "discount": 0,
+      "order": 3
     },
     {
       "id": "c7012756-2359-4be6-bf2e-f4040573c619",
@@ -31,7 +46,12 @@
       "title": "",
       "desc": "",
       "img": "/uploads/img_1759156987789_87337559a93b460391309440b96b9aa0.png",
-      "visible": true
+      "visible": true,
+      "unit": "1 UNIT",
+      "price": 18.0,
+      "rating": 4.5,
+      "discount": 0,
+      "order": 4
     },
     {
       "id": "6aa5cf05-9ade-4d93-b94d-2e196dc2b1b4",
@@ -39,7 +59,12 @@
       "title": "",
       "desc": "",
       "img": "/uploads/img_1759157025646_3b4302e5e1a64675a9cf15ed79b8adba.png",
-      "visible": true
+      "visible": true,
+      "unit": "1 UNIT",
+      "price": 18.0,
+      "rating": 4.5,
+      "discount": 0,
+      "order": 5
     },
     {
       "id": "253420bf-7c9e-4c96-bc87-3fec43e30f15",
@@ -47,7 +72,12 @@
       "title": "",
       "desc": "",
       "img": "/uploads/img_1759157049243_c085dd629e4e4b3ca4e33575da3faa9f.png",
-      "visible": true
+      "visible": true,
+      "unit": "1 UNIT",
+      "price": 18.0,
+      "rating": 4.5,
+      "discount": 0,
+      "order": 6
     },
     {
       "id": "32a6a9e8-fdaa-46e8-884a-a1605f57c9ab",
@@ -55,7 +85,12 @@
       "title": "",
       "desc": "",
       "img": "/uploads/img_1759157057134_8b74f1a8a1e345c8b8466ad308c420f0.png",
-      "visible": true
+      "visible": true,
+      "unit": "1 UNIT",
+      "price": 18.0,
+      "rating": 4.5,
+      "discount": 0,
+      "order": 7
     },
     {
       "id": "6ae19b06-1b75-40c8-b5e1-6e413e53fe57",
@@ -63,7 +98,12 @@
       "title": "",
       "desc": "",
       "img": "/uploads/img_1759157064024_90cc7ba8cc954e4b885c702878bc8101.png",
-      "visible": true
+      "visible": true,
+      "unit": "1 UNIT",
+      "price": 18.0,
+      "rating": 4.5,
+      "discount": 0,
+      "order": 8
     }
   ]
 }

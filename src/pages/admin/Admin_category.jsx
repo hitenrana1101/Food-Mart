@@ -96,6 +96,7 @@ export default function Categorypage() {
 
     return (
         <div className="min-h-screen bg-slate-50 py-6 px-4 md:px-6">
+            <title>Food Mart Admin Category</title>
             {/* Top: Service meta card */}
             <section className="mx-auto w-[1200px] rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                 <h1 className="text-xl font-semibold text-slate-900 mb-2">Custom Door Service</h1>

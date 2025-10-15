@@ -35,7 +35,7 @@ const items = [
     label: "Our Recent Blog", base: "/range", icon: <FiLayers />, subs: [
       { label: "Overview", to: "/admin/recent" }, 
     ]
-  },
+  },  
   {
     label: "Products", base: "/products-main", icon: <FiBox />, subs: [
       { label: "Overview", to: "/products-main/overview" },

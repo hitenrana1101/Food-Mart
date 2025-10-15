@@ -11,7 +11,7 @@ export default function NewlyArrived() {
 
   useEffect(() => {
     (async () => {
-      const res = await fetch(`/api/new-arrived`);
+      const res = await fetch(`/api/new-arrived?ts=${Date.now()}`, { cache: "no-store" });
       const json = await res.json();
       setTitle(json.title || "Newly Arrived Brands");
       setItems((json.cards || []).filter((c) => c.visible !== false));
@@ -80,7 +80,7 @@ export default function NewlyArrived() {
           <article key={b.id} className="snap-start snap-always shrink-0 basis-[calc((100%-32px)/2)] md:basis-[calc((100%-64px)/3)] lg:basis-[calc((100%-96px)/4)] h-auto lg:h-[144px] rounded-2xl bg-white p-5 grid grid-cols-1 md:grid-cols-[108px_1fr] items-start md:items-center gap-3 md:gap-4 shadow-[0_12px_28px_rgba(0,0,0,0.12)]">
             <div className="w-full md:w-[108px] h-[160px] md:h-[108px] rounded-xl overflow-hidden border border-slate-200 bg-slate-100">
               {b.img ? (
-                <img src={b.img} alt={`${b.brand} - ${b.title}`} className="w-full h-full object-cover" loading="lazy" decoding="async" draggable="false" />
+                <img src={b.img} alt={`${b.brand || ""} - ${b.title || ""}`} className="w-full h-full object-cover" loading="lazy" decoding="async" draggable="false" />
               ) : (
                 <div className="w-full h-full bg-gradient-to-b from-white to-slate-100" aria-hidden="true" />
               )}

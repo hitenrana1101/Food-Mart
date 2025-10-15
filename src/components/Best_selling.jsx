@@ -2,31 +2,90 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { Heart, Star, ChevronLeft, ChevronRight } from "lucide-react";
 
-// Optional: local fallback images if API items lack images
-// import Banana from "../img/banana.png";
-// import Tomato from "../img/tomatoe.png";
-// import Ketchup from "../img/Ketchup.png";
+// Normalize backend -> UI
+function adapt(cards) {
+  const list = Array.isArray(cards) ? cards : [];
+  return list
+    .filter((c) => c?.visible !== false)
+    .map((c, i) => {
+      const num = (v, d = 0) => (Number.isFinite(Number(v)) ? Number(v) : d);
+      return {
+        id: c.id || `bs-${i}`,
+        title: String(c.title || c.brand || "Untitled"),
+        brand: String(c.brand || ""),
+        desc: String(c.desc || ""),
+        img: String(c.img || ""),
+        price: num(c.price, 0),
+        unit: String(c.unit || "1 UNIT"),
+        rating: num(c.rating, 0),
+        discount: num(c.discount, 0),
+        category: String(c.category || "ALL"),
+        qty: num(c.qty, 0),
+        orders: num(c.orders, 0),
+        order: num(c.order, i + 1),
+      };
+    });
+}
 
 async function fetchBestSelling() {
   const res = await fetch(`/api/best-selling?ts=${Date.now()}`, { cache: "no-store" });
   if (!res.ok) throw new Error(`GET /api/best-selling ${res.status}`);
   const data = await res.json();
   const cards = Array.isArray(data?.cards) ? data.cards : [];
-  return cards
-    .filter((c) => c.visible !== false)
-    .slice(0, 8)
-    .map((c, i) => ({
-      id: c.id || `bs-${i}`,
-      title: c.title || c.brand || "Untitled",
-      img: c.img || "",
-      unit: c.unit || "1 UNIT",
-      price: Number.isFinite(Number(c.price)) ? Number(c.price) : 18,
-      rating: Number.isFinite(Number(c.rating)) ? Number(c.rating) : 4.5,
-      discount: Number.isFinite(Number(c.discount)) ? Number(c.discount) : 0,
-    }));
+  const normalized = adapt(cards);
+  normalized.sort((a, b) => (a.order || 0) - (b.order || 0));
+  return normalized;
 }
 
-function Card({ item, qty, onDec, onInc, onToggleWish, wished }) {
+async function createOrder(payload) {
+  const res = await fetch("/api/orders", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data?.error) throw new Error(data?.error || `Order failed ${res.status}`);
+  return data; // created order object
+}
+
+async function incrementBestSelling(productId, units) {
+  // Optional: ignore failures to keep UX smooth if this endpoint isn’t present
+  try {
+    const res = await fetch("/api/best-selling/order", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: productId, qty: units }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data?.error) return null;
+    return Number.isFinite(Number(data.orders)) ? Number(data.orders) : null;
+  } catch {
+    return null;
+  }
+}
+
+// NEW: check requested qty against stock without mutating inventory
+async function checkBestSellingQty(productId, units) {
+  try {
+    const res = await fetch("/api/best-selling/check-qty", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: productId, qty: units }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return { outOfStock: false, stock: 0, cappedQty: units };
+    return {
+      outOfStock: !!data.outOfStock,
+      stock: Number.isFinite(Number(data.stock)) ? Number(data.stock) : 0,
+      cappedQty: Number.isFinite(Number(data.cappedQty)) ? Number(data.cappedQty) : units,
+    };
+  } catch {
+    // If endpoint missing, fall back to no OOS flag so UX still works
+    return { outOfStock: false, stock: 0, cappedQty: units };
+  }
+}
+
+function Card({ item, qty, onDec, onInc, onToggleWish, wished, onOrder, oos }) {
   return (
     <article className="relative rounded-2xl border border-neutral-200 bg-white shadow-sm transition hover:shadow-2xl hover:-translate-y-0.5 duration-200">
       <div className="relative p-4">
@@ -35,7 +94,6 @@ function Card({ item, qty, onDec, onInc, onToggleWish, wished }) {
             -{item.discount}%
           </span>
         ) : null}
-
         <button
           onClick={onToggleWish}
           className="absolute right-4 top-4 h-9 w-9 grid place-items-center rounded-full bg-white/90 ring-1 ring-neutral-200 hover:bg-white"
@@ -44,7 +102,6 @@ function Card({ item, qty, onDec, onInc, onToggleWish, wished }) {
         >
           <Heart size={18} className={wished ? "fill-rose-500 stroke-rose-500" : "stroke-neutral-700"} />
         </button>
-
         <div className="aspect-[4/3] rounded-xl bg-neutral-50 overflow-hidden grid place-items-center">
           {/* eslint-disable-next-line */}
           <img src={item.img} alt={item.title} className="h-full w-full object-contain" loading="lazy" />
@@ -60,13 +117,48 @@ function Card({ item, qty, onDec, onInc, onToggleWish, wished }) {
         <h2 className="mt-2 line-clamp-2 text-[15px] font-semibold text-neutral-900">{item.title}</h2>
         <div className="mt-2 text-lg font-semibold text-neutral-900">${Number(item.price).toFixed(2)}</div>
 
+        {/* Stock and OOS indicator */}
+        <div className="mt-1 text-[12px]">
+          {oos ? (
+            <span className="text-rose-600 font-semibold">Out of Stock</span>
+          ) : Number(item.qty) > 0 ? (
+            <span className="text-neutral-500">{item.qty} in stock</span>
+          ) : (
+            <span className="text-rose-600 font-semibold">Out of Stock</span>
+          )}
+        </div>
+
         <div className="mt-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <button type="button" onClick={onDec} className="h-7 w-7 grid place-items-center rounded-md border border-neutral-300 text-sm hover:bg-neutral-100" aria-label="Decrease">–</button>
+            <button
+              type="button"
+              onClick={onDec}
+              className="h-7 w-7 grid place-items-center rounded-md border border-neutral-300 text-sm hover:bg-neutral-100"
+              aria-label="Decrease"
+              disabled={qty <= 1}
+            >
+              –
+            </button>
             <span className="min-w-[1.5rem] text-center text-sm font-medium">{qty}</span>
-            <button type="button" onClick={onInc} className="h-7 w-7 grid place-items-center rounded-md border border-neutral-300 text-sm hover:bg-neutral-100" aria-label="Increase">+</button>
+            {/* IMPORTANT: allow increment even if stock is 0; OOS will be flagged */}
+            <button
+              type="button"
+              onClick={onInc}
+              className="h-7 w-7 grid place-items-center rounded-md border border-neutral-300 text-sm hover:bg-neutral-100"
+              aria-label="Increase"
+            >
+              +
+            </button>
           </div>
-          <button type="button" className="text-sm text-[#747474]">Add to Cart</button>
+          <button
+            type="button"
+            className="text-sm text-[#747474] disabled:opacity-60"
+            onClick={onOrder}
+            disabled={oos}
+            title={oos ? "Out of Stock" : "Add to Cart"}
+          >
+            Order
+          </button>
         </div>
       </div>
     </article>
@@ -77,6 +169,8 @@ export default function BestSellingProducts() {
   const [items, setItems] = useState([]);
   const [qty, setQty] = useState({});
   const [wish, setWish] = useState(() => new Set());
+  const [oos, setOOS] = useState({}); // { [id]: boolean }
+
   const [canLeft, setCanLeft] = useState(false);
   const [canRight, setCanRight] = useState(true);
   const [loading, setLoading] = useState(true);
@@ -84,7 +178,6 @@ export default function BestSellingProducts() {
   const scrollerRef = useRef(null);
   const firstItemRef = useRef(null);
 
-  // Load from API
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -93,11 +186,18 @@ export default function BestSellingProducts() {
         const data = await fetchBestSelling();
         if (!alive) return;
         setItems(data);
-        setQty(Object.fromEntries(data.map((p) => [p.id, 1])));
-      } catch (e) {
+        const initialQty = Object.fromEntries(data.map((p) => [p.id, 1]));
+        setQty(initialQty);
+        // Seed OOS based on stock for qty=1
+        const seededOOS = Object.fromEntries(
+          data.map((p) => [p.id, Number(p.qty) <= 0 ? true : false])
+        );
+        setOOS(seededOOS);
+      } catch {
         if (!alive) return;
-        setItems([]); // keep empty if API fails
+        setItems([]);
         setQty({});
+        setOOS({});
       } finally {
         if (alive) setLoading(false);
       }
@@ -105,11 +205,28 @@ export default function BestSellingProducts() {
     return () => { alive = false; };
   }, []);
 
-  const dec = (id) => setQty((q) => ({ ...q, [id]: Math.max(1, (q[id] || 1) - 1) }));
-  const inc = (id) => setQty((q) => ({ ...q, [id]: Math.min(99, (q[id] || 1) + 1) }));
-  const toggleWish = (id) => setWish((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  // Utilities
+  const setQtyAndCheck = async (id, nextQty) => {
+    setQty((q) => ({ ...q, [id]: nextQty }));
+    const res = await checkBestSellingQty(id, nextQty);
+    setOOS((m) => ({ ...m, [id]: !!res.outOfStock }));
+  };
 
-  // One-card step calc
+  const dec = (id) =>
+    setQtyAndCheck(id, Math.max(1, (qty[id] || 1) - 1));
+
+  // IMPORTANT: remove stock clamp; allow increasing beyond stock
+  const inc = (id) =>
+    setQtyAndCheck(id, (qty[id] || 1) + 1);
+
+  const toggleWish = (id) =>
+    setWish((s) => {
+      const n = new Set(s);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
+
+  // Carousel helpers
   const getStep = useCallback((node) => {
     if (!node || !firstItemRef.current) return 0;
     const style = getComputedStyle(node);
@@ -125,24 +242,29 @@ export default function BestSellingProducts() {
     setCanRight(node.scrollLeft < node.scrollWidth - node.clientWidth - tol);
   }, []);
 
-  const scrollToIndex = useCallback((node, index, behavior = "smooth") => {
-    if (!node) return;
-    const step = getStep(node);
-    const maxLeft = node.scrollWidth - node.clientWidth;
-    const target = Math.max(0, Math.min(index * step, maxLeft));
-    node.scrollTo({ left: target, behavior });
-  }, [getStep]);
+  const scrollToIndex = useCallback(
+    (node, index, behavior = "smooth") => {
+      if (!node) return;
+      const step = getStep(node);
+      const maxLeft = node.scrollWidth - node.clientWidth;
+      const target = Math.max(0, Math.min(index * step, maxLeft));
+      node.scrollTo({ left: target, behavior });
+    },
+    [getStep]
+  );
 
-  const scrollByOne = useCallback((dir) => {
-    const node = scrollerRef.current;
-    if (!node) return;
-    const step = getStep(node);
-    const currentIndex = step ? Math.round(node.scrollLeft / step) : 0;
-    const nextIndex = dir === "right" ? currentIndex + 1 : currentIndex - 1;
-    scrollToIndex(node, nextIndex);
-  }, [getStep, scrollToIndex]);
+  const scrollByOne = useCallback(
+    (dir) => {
+      const node = scrollerRef.current;
+      if (!node) return;
+      const step = getStep(node);
+      const currentIndex = step ? Math.round(node.scrollLeft / step) : 0;
+      const nextIndex = dir === "right" ? currentIndex + 1 : currentIndex - 1;
+      scrollToIndex(node, nextIndex);
+    },
+    [getStep, scrollToIndex]
+  );
 
-  // Keep snapping stable
   useEffect(() => {
     const node = scrollerRef.current;
     if (!node) return;
@@ -156,12 +278,98 @@ export default function BestSellingProducts() {
     });
     ro.observe(node);
     updateButtons(node);
-    return () => { node.removeEventListener("scroll", onScroll); ro.disconnect(); };
+    return () => {
+      node.removeEventListener("scroll", onScroll);
+      ro.disconnect();
+    };
   }, [getStep, scrollToIndex, updateButtons]);
 
-  const onKeyDown = (e) => {
-    if (e.key === "ArrowRight") { e.preventDefault(); scrollByOne("right"); }
-    if (e.key === "ArrowLeft")  { e.preventDefault(); scrollByOne("left"); }
+  useEffect(() => {
+    let bc;
+    let alive = true;
+    const reload = async () => {
+      try {
+        setLoading(true);
+        const data = await fetchBestSelling();
+        if (!alive) return;
+        setItems(data);
+        setQty(Object.fromEntries(data.map((p) => [p.id, 1])));
+        setOOS(Object.fromEntries(data.map((p) => [p.id, Number(p.qty) <= 0])));
+      } finally {
+        if (alive) setLoading(false);
+      }
+    };
+    try {
+      bc = new BroadcastChannel("best-selling");
+      bc.onmessage = (ev) => {
+        if (ev?.data?.type === "updated") reload();
+      };
+    } catch {}
+    const onStorage = (e) => {
+      if (e.key === "best-selling-updated") reload();
+    };
+    window.addEventListener("storage", onStorage);
+    return () => {
+      alive = false;
+      window.removeEventListener("storage", onStorage);
+      try {
+        bc && bc.close();
+      } catch {}
+    };
+  }, []);
+
+  const orderNow = async (item) => {
+    const wanted = qty[item.id] ?? 1;
+
+    // First check against stock without mutating inventory
+    const check = await checkBestSellingQty(item.id, wanted);
+    if (check.outOfStock) {
+      setOOS((m) => ({ ...m, [item.id]: true }));
+      return alert(`Out of Stock (stock: ${check.stock})`);
+    }
+
+    try {
+      // Create an order like Trending
+      const orderPayload = {
+        id: crypto.randomUUID(),
+        productId: item.id,
+        title: item.title,
+        brand: item.brand,
+        unit: item.unit,
+        price: Number(item.price),
+        qty: wanted,
+        subtotal: Number(item.price) * wanted,
+        category: item.category,
+        discount: Number(item.discount) || 0,
+        createdAt: new Date().toISOString(),
+      };
+      const created = await createOrder(orderPayload);
+
+      // Optional: decrement stock server-side and increment orders counter
+      const latestOrders = await incrementBestSelling(item.id, wanted);
+
+      // Update local UI (best effort)
+      setItems((arr) =>
+        arr.map((p) =>
+          p.id === item.id
+            ? {
+                ...p,
+                qty: Math.max(0, Number(p.qty || 0) - wanted),
+                orders:
+                  Number.isFinite(Number(latestOrders)) ? latestOrders : Number(p.orders || 0) + wanted,
+              }
+            : p
+        )
+      );
+
+      // Re-check after order
+      const postCheck = await checkBestSellingQty(item.id, qty[item.id] ?? 1);
+      setOOS((m) => ({ ...m, [item.id]: !!postCheck.outOfStock }));
+
+      alert(`Order placed #${created.id} for ${wanted} × ${item.title}`);
+    } catch (e) {
+      alert(e?.message || "Order failed");
+    }
   };
 
   return (
@@ -171,10 +379,22 @@ export default function BestSellingProducts() {
         <div className="flex items-center gap-3">
           <span className="text-sm font-semibold text-[#747474] hover:text-neutral-900">View All Categories →</span>
           <div className="flex items-center">
-            <button type="button" onClick={() => scrollByOne("left")} aria-label="Previous" disabled={!canLeft} className="rounded-md bg-neutral-100 hover:bg-neutral-200 p-2 disabled:opacity-40 disabled:cursor-not-allowed">
+            <button
+              type="button"
+              onClick={() => scrollByOne("left")}
+              aria-label="Previous"
+              disabled={!canLeft}
+              className="rounded-md bg-neutral-100 hover:bg-neutral-200 p-2 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
               <ChevronLeft size={18} />
             </button>
-            <button type="button" onClick={() => scrollByOne("right")} aria-label="Next" disabled={!canRight} className="ml-2 rounded-md bg-neutral-100 hover:bg-neutral-200 p-2 disabled:opacity-40 disabled:cursor-not-allowed">
+            <button
+              type="button"
+              onClick={() => scrollByOne("right")}
+              aria-label="Next"
+              disabled={!canRight}
+              className="ml-2 rounded-md bg-neutral-100 hover:bg-neutral-200 p-2 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
               <ChevronRight size={18} />
             </button>
           </div>
@@ -187,7 +407,16 @@ export default function BestSellingProducts() {
         aria-roledescription="carousel"
         aria-label="Best selling products carousel"
         tabIndex={0}
-        onKeyDown={onKeyDown}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowRight") {
+            e.preventDefault();
+            scrollByOne("right");
+          }
+          if (e.key === "ArrowLeft") {
+            e.preventDefault();
+            scrollByOne("left");
+          }
+        }}
         onWheel={(e) => {
           if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
             e.preventDefault();
@@ -229,6 +458,8 @@ export default function BestSellingProducts() {
                 onInc={() => inc(item.id)}
                 onToggleWish={() => toggleWish(item.id)}
                 wished={wish.has(item.id)}
+                onOrder={() => orderNow(item)}
+                oos={!!oos[item.id]}
               />
             </div>
           ))
