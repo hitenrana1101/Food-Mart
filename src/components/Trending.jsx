@@ -19,10 +19,46 @@ function adapt(cards) {
         rating: num(c.rating, 0),
         discount: num(c.discount, 0),
         category: String(c.category || "ALL"),
-        qty: num(c.qty, 0),         // stock for caps, badges
-        order: num(c.order, i + 1)  // stable order from admin
+        qty: num(c.qty, 0),        // stock for caps, badges
+        order: num(c.order, i + 1) // stable order from admin
       };
     });
+}
+
+// Check requested qty against stock without mutating (new helper)
+async function checkTrendingQty(productId, units) {
+  try {
+    const res = await fetch("/api/trending/check-qty", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: productId, qty: units }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return { outOfStock: false, stock: 0, cappedQty: units };
+    }
+    return {
+      outOfStock: !!data.outOfStock,
+      stock: Number.isFinite(Number(data.stock)) ? Number(data.stock) : 0,
+      cappedQty: Number.isFinite(Number(data.cappedQty)) ? Number(data.cappedQty) : units,
+    };
+  } catch {
+    // If endpoint missing, fall back to no OOS flag so UX still works
+    return { outOfStock: false, stock: 0, cappedQty: units };
+  }
+}
+
+// Decrement trending stock (server)
+async function placeOrder({ id, qty }) {
+  const res = await fetch("/api/trending/order", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id, qty }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || `Order failed ${res.status}`);
+  // { ok, id, qty } -> qty is remaining stock
+  return data;
 }
 
 export default function Trending() {
@@ -32,6 +68,9 @@ export default function Trending() {
   const [wish, setWish] = useState(() => new Set());
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+
+  // Per-item out-of-stock map (true when requested qty > stock or stock<=0)
+  const [oos, setOOS] = useState({});
 
   // Fetch latest trending from admin-saved JSON
   useEffect(() => {
@@ -50,10 +89,13 @@ export default function Trending() {
         normalized.sort((a, b) => (a.order || 0) - (b.order || 0));
         setItems(normalized);
         setQtyMap(Object.fromEntries(normalized.map((p) => [p.id, 1])));
+        setOOS(Object.fromEntries(normalized.map((p) => [p.id, Number(p.qty) <= 0])));
       } catch (e) {
         if (e?.name === "AbortError") return;
         setErr(e?.message || "Failed to load");
         setItems([]);
+        setQtyMap({});
+        setOOS({});
       } finally {
         setLoading(false);
       }
@@ -73,17 +115,17 @@ export default function Trending() {
     [active, items]
   );
 
-  const dec = (id) =>
-    setQtyMap((q) => ({ ...q, [id]: Math.max(1, (q[id] || 1) - 1) }));
+  // Helpers to update qty and compute OOS via backend check
+  const setQtyAndCheck = async (id, nextQty) => {
+    setQtyMap((q) => ({ ...q, [id]: nextQty }));
+    const res = await checkTrendingQty(id, nextQty);
+    setOOS((m) => ({ ...m, [id]: !!res.outOfStock }));
+  };
 
-  const inc = (id) =>
-    setQtyMap((q) => {
-      const item = items.find((x) => x.id === id);
-      const stock = item ? Number(item.qty) : 0;
-      const current = q[id] || 1;
-      const cap = stock > 0 ? stock : 99;
-      return { ...q, [id]: Math.min(cap, current + 1) };
-    });
+  const dec = (id) => setQtyAndCheck(id, Math.max(1, (qtyMap[id] || 1) - 1));
+
+  // IMPORTANT: remove stock clamp; allow increasing beyond stock
+  const inc = (id) => setQtyAndCheck(id, (qtyMap[id] || 1) + 1);
 
   const toggleWish = (id) =>
     setWish((s) => {
@@ -92,36 +134,26 @@ export default function Trending() {
       return n;
     });
 
-  // POST helper to decrement trending stock
-  const placeOrder = async ({ id, qty }) => {
-    const res = await fetch("/api/trending/order", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, qty }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data?.error || `Order failed ${res.status}`);
-    // { ok, id, qty } -> qty is remaining stock
-    return data;
-  };
-
-  // Stock-aware order action
+  // Stock-aware order action with pre-check
   const orderNow = async (item) => {
     const wanted = qtyMap[item.id] ?? 1;
-    const stock = Number(item.qty) || 0;
-    if (stock <= 0) return alert("Out of Stock");
-    if (wanted > stock) return alert(`Only ${stock} in stock`);
+
+    // Pre-check to allow UI > stock but flag OOS
+    const check = await checkTrendingQty(item.id, wanted);
+    if (check.outOfStock) {
+      setOOS((m) => ({ ...m, [item.id]: true }));
+      return alert(`Out of Stock (stock: ${check.stock})`);
+    }
+
     try {
       const result = await placeOrder({ id: item.id, qty: wanted }); // decrement on server
 
       // Update UI stock from server truth
       setItems((prev) => prev.map((p) => (p.id === item.id ? { ...p, qty: result.qty } : p)));
 
-      // Clamp selector to remaining stock (>=1 if any left)
-      setQtyMap((prev) => {
-        const next = result.qty > 0 ? Math.min(prev[item.id] || 1, result.qty) : 1;
-        return { ...prev, [item.id]: next };
-      });
+      // After placing order, re-check current desired qty to refresh OOS badge
+      const postCheck = await checkTrendingQty(item.id, qtyMap[item.id] ?? 1);
+      setOOS((m) => ({ ...m, [item.id]: !!postCheck.outOfStock }));
 
       alert(`Order placed for ${wanted} x ${item.title}. Remaining stock: ${result.qty}`);
     } catch (e) {
@@ -161,8 +193,8 @@ export default function Trending() {
       ) : (
         <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {filtered.map((item) => {
-            const out = Number(item.qty) <= 0;
             const q = qtyMap[item.id] ?? 1;
+            const isOOS = !!oos[item.id] || Number(item.qty) <= 0;
             return (
               <article
                 key={item.id}
@@ -174,7 +206,7 @@ export default function Trending() {
                       -{item.discount}%
                     </span>
                   )}
-                  {out && (
+                  {isOOS && (
                     <span className="absolute left-4 top-4 rounded-md bg-rose-100 text-rose-700 text-xs font-semibold px-2 py-1">
                       Out of Stock
                     </span>
@@ -215,8 +247,12 @@ export default function Trending() {
                   <div className="mt-2 text-[22px] font-semibold text-neutral-900">
                     ${Number(item.price).toFixed(2)}
                   </div>
-                  <div className="mt-1 text-[12px] text-neutral-500">
-                    {Number(item.qty) > 0 ? `${item.qty} in stock` : "Out of Stock"}
+                  <div className="mt-1 text-[12px]">
+                    {isOOS ? (
+                      <span className="text-rose-600 font-semibold">Out of Stock</span>
+                    ) : (
+                      <span className="text-neutral-500">{item.qty} in stock</span>
+                    )}
                   </div>
 
                   <div className="mt-3 flex items-center justify-between">
@@ -226,17 +262,17 @@ export default function Trending() {
                         onClick={() => dec(item.id)}
                         className="h-8 w-8 grid place-items-center rounded-md border border-neutral-300 text-sm hover:bg-neutral-100"
                         aria-label="Decrease"
-                        disabled={out}
+                        disabled={q <= 1}
                       >
                         –
                       </button>
                       <span className="min-w-[1.5rem] text-center text-sm font-medium">{q}</span>
+                      {/* Allow increment beyond stock; OOS badge handles UX */}
                       <button
                         type="button"
                         onClick={() => inc(item.id)}
                         className="h-8 w-8 grid place-items-center rounded-md border border-neutral-300 text-sm hover:bg-neutral-100"
                         aria-label="Increase"
-                        disabled={out}
                       >
                         +
                       </button>
@@ -244,8 +280,9 @@ export default function Trending() {
                     <button
                       type="button"
                       onClick={() => orderNow(item)}
-                      disabled={out}
+                      disabled={isOOS}
                       className="text-sm text-[#747474] disabled:opacity-60"
+                      title={isOOS ? "Out of Stock" : "Add to Cart"}
                     >
                       Order
                     </button>

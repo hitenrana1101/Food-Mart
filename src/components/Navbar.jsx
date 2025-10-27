@@ -1,13 +1,244 @@
- import React, { useState } from "react";
+import React, { useEffect, useRef, useState, useId } from "react";
 import { IoSearch } from "react-icons/io5";
 import { LuUserRound } from "react-icons/lu";
 import { RiHeartLine } from "react-icons/ri";
 import { FiShoppingCart } from "react-icons/fi";
 import logo from "../img/main_logo.png";
 
+/* User dropdown (disclosure pattern) */
+function UserMenu({ user, compact = false }) {
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef(null);
+  const panelRef = useRef(null);
+  const rootRef = useRef(null);
+  const uid = useId();
+  const panelId = `user-menu-${uid}`;
+
+  useEffect(() => {
+    function onKeyDown(e) {
+      if (e.key === "Escape") {
+        setOpen(false);
+        btnRef.current?.focus();
+      }
+    }
+    function onPointerDown(e) {
+      if (rootRef.current && !rootRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    }
+    if (open) {
+      document.addEventListener("keydown", onKeyDown);
+      document.addEventListener("mousedown", onPointerDown);
+      document.addEventListener("touchstart", onPointerDown);
+    }
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("touchstart", onPointerDown);
+    };
+  }, [open]);
+
+  const initial = (user?.name?.[0] || "?").toUpperCase();
+
+  return (
+    <div ref={rootRef} className="relative">
+      <button
+        ref={btnRef}
+        type="button"
+        aria-haspopup="true"
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={() => setOpen(v => !v)}
+        className={compact
+          ? "w-10 h-10 p-2 flex items-center justify-center rounded-full bg-gray-50"
+          : "w-10 h-10 p-2 flex items-center justify-center rounded-full bg-gray-50"}
+      >
+        <LuUserRound className="text-xl text-gray-700" />
+        <span className="sr-only">User menu</span>
+      </button>
+
+      <div
+        id={panelId}
+        ref={panelRef}
+        hidden={!open}
+        className={[
+          "absolute z-50 w-72 rounded-xl border border-neutral-200 bg-white shadow-lg",
+          compact ? "right-0 mt-2" : "right-0 mt-2"
+        ].join(" ")}
+      >
+        <div className="p-4 flex items-center gap-3">
+          <div className="h-10 w-10 rounded-full bg-teal-600 text-white grid place-items-center font-semibold">
+            {initial}
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-gray-900 truncate">{user?.name || "Guest"}</p>
+            <p className="text-xs text-gray-600 truncate">{user?.email || "guest@example.com"}</p>
+          </div>
+        </div>
+        <div className="py-1">
+          <a href="#" className="block px-4 py-2 text-sm text-gray-800 hover:bg-neutral-50">My Account</a>
+          <a href="#" className="block px-4 py-2 text-sm text-gray-800 hover:bg-neutral-50">Orders</a>
+          <a href="#" className="block px-4 py-2 text-sm text-gray-800 hover:bg-neutral-50">Wishlist</a>
+        </div>
+        <div className="border-t border-neutral-200" />
+        <button
+          type="button"
+          onClick={() => {
+            setOpen(false);
+            // TODO: add your sign-out logic here
+          }}
+          className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-b-xl"
+        >
+          Logout
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* Wishlist dropdown (disclosure pattern) */
+function WishlistMenu() {
+  const [open, setOpen] = useState(false);
+  const [items, setItems] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("wishlist") || "[]"); }
+    catch { return []; }
+  });
+  const btnRef = useRef(null);
+  const rootRef = useRef(null);
+  const uid = useId();
+  const panelId = `wishlist-panel-${uid}`;
+
+  useEffect(() => {
+    function onKeyDown(e) {
+      if (e.key === "Escape") {
+        setOpen(false);
+        btnRef.current?.focus();
+      }
+    }
+    function onPointerDown(e) {
+      if (rootRef.current && !rootRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    }
+    if (open) {
+      document.addEventListener("keydown", onKeyDown);
+      document.addEventListener("mousedown", onPointerDown);
+      document.addEventListener("touchstart", onPointerDown);
+    }
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("touchstart", onPointerDown);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    function onStorage(e) {
+      if (e.key === "wishlist") {
+        try { setItems(JSON.parse(e.newValue || "[]") || []); }
+        catch { setItems([]); }
+      }
+    }
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
+  const count = items.length;
+  function write(next) {
+    localStorage.setItem("wishlist", JSON.stringify(next));
+    setItems(next);
+  }
+  function removeItem(id) {
+    write(items.filter(x => x.id !== id));
+  }
+  function clearAll() {
+    write([]);
+  }
+  function handleAddToCart(item) {
+    const ev = new CustomEvent("add-to-cart", { detail: item });
+    window.dispatchEvent(ev);
+  }
+
+  return (
+    <div ref={rootRef} className="relative">
+      <button
+        ref={btnRef}
+        type="button"
+        aria-haspopup="true"
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={() => setOpen(v => !v)}
+        className="relative w-10 h-10 p-2 flex items-center justify-center rounded-full bg-gray-50"
+      >
+        <RiHeartLine className="text-xl text-gray-700" />
+        {count > 0 && (
+          <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-teal-600 text-white text-xs grid place-items-center">
+            {count}
+          </span>
+        )}
+        <span className="sr-only">Wishlist</span>
+      </button>
+
+      <div
+        id={panelId}
+        hidden={!open}
+        className="absolute right-0 mt-2 z-50 w-80 max-h-[70vh] overflow-auto rounded-xl border border-neutral-200 bg-white shadow-lg"
+      >
+        <div className="px-4 py-3 border-b border-neutral-200 flex items-center justify-between">
+          <p className="text-sm font-semibold text-gray-900">Your Wishlist</p>
+          {items.length > 0 && (
+            <button type="button" onClick={clearAll} className="text-xs text-red-600 hover:text-red-700">
+              Clear all
+            </button>
+          )}
+        </div>
+
+        {items.length === 0 ? (
+          <div className="p-4 text-sm text-gray-600">No liked items yet.</div>
+        ) : (
+          <ul className="divide-y divide-neutral-200">
+            {items.map(item => (
+              <li key={item.id} className="p-3 flex gap-3 items-center">
+                <img
+                  src={item.image}
+                  alt={item.name}
+                  className="h-14 w-14 rounded-md object-cover bg-neutral-100"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-gray-900 truncate">{item.name}</p>
+                  <p className="text-xs text-gray-600 truncate">
+                    {typeof item.price === "number" ? `₹${item.price.toFixed(2)}` : item.price}
+                  </p>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <button
+                    type="button"
+                    onClick={() => handleAddToCart(item)}
+                    className="px-2 py-1 text-xs rounded-md bg-teal-600 text-white hover:bg-teal-700"
+                  >
+                    Add
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeItem(item.id)}
+                    className="px-2 py-1 text-xs rounded-md bg-neutral-100 text-gray-800 hover:bg-neutral-200"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);        // desktop Pages
   const [mobileOpen, setMobileOpen] = useState(false); // mobile menu
+  const currentUser = { name: "Hiten Rana", email: "hiten9968@gmail.com" };
 
   return (
     <header className="w-full ">
@@ -41,20 +272,20 @@ export default function Navbar() {
             </div>
           </div>
 
-          {/* Right side (desktop only so icons don't duplicate) */}
+          {/* Right side (desktop only) */}
           <div className="hidden lg:flex items-center flex-wrap justify-end gap-4 min-w-0">
             <div className="text-end py-1 px-2 md:px-7">
               <p className="text-[#212529bf]">For Support?</p>
               <h1 className="text-lg font-semibold">+980-34984089</h1>
             </div>
-            <div className="flex gap-2 py-1">
-              <span className="w-10 h-10 p-2 flex items-center justify-center rounded-full bg-gray-50">
-                <LuUserRound className="text-xl text-gray-700" />
-              </span>
-              <span className="w-10 h-10 p-2 flex items-center justify-center rounded-full bg-gray-50">
-                <RiHeartLine className="text-xl text-gray-700" />
-              </span>
+
+            <div className="flex gap-2 py-1 cursor-pointer">
+              {/* User dropdown here */}
+              <UserMenu user={currentUser} />
+              {/* Wishlist dropdown here */}
+              <WishlistMenu />
             </div>
+
             <div className="p-2">
               <span className="text-[#212529bf] block">Your Cart</span>
               <span className="font-semibold text-black text-[19px]">$1290.00</span>
@@ -63,7 +294,7 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* DESKTOP NAV (unchanged) */}
+      {/* DESKTOP NAV (unchanged except code above) */}
       <nav className="hidden lg:block">
         <div className="max-w-screen-2xl mx-auto px-4 py-2 flex mt-3 items-center space-x-8">
           <div className="relative">
@@ -84,7 +315,7 @@ export default function Navbar() {
               <button
                 onClick={() => setIsOpen(!isOpen)}
                 type="button"
-                aria-haspopup="menu"
+                aria-haspopup="true"
                 aria-expanded={isOpen}
                 aria-controls="desktop-pages"
                 className="px-4 py-2 text-gray-700 rounded-md flex items-center hover:text-[#1b5a5a] transition"
@@ -95,12 +326,12 @@ export default function Navbar() {
                 </svg>
               </button>
               {isOpen && (
-                <div id="desktop-pages" role="menu" className="absolute top-full left-0 mt-2 bg-white border border-gray-200 rounded-md shadow-lg py-2 w-48 z-50">
+                <div id="desktop-pages" className="absolute top-full left-0 mt-2 bg-white border border-gray-200 rounded-md shadow-lg py-2 w-48 z-50">
                   {[
                     "About Us","Shop","Single Product","Cart","Checkout","Blog","Single Post",
                     "Styles","Contact","Thank You","My Account","404 Error",
                   ].map((item) => (
-                    <a key={item} href="#" role="menuitem" className="block px-4 py-2 text-gray-700 rounded-[10px] hover:bg-gray-200">
+                    <a key={item} href="#" className="block px-4 py-2 text-gray-700 rounded-[10px] hover:bg-gray-200">
                       {item}
                     </a>
                   ))}
@@ -115,12 +346,13 @@ export default function Navbar() {
         </div>
       </nav>
 
-      {/* MOBILE HEADER (icons row + centered hamburger) */}
+      {/* MOBILE HEADER */}
       <div className="lg:hidden">
-        {/* One icons row only (no duplicates) */}
         <div className="flex items-center justify-center gap-6 py-3">
-          <button type="button" aria-label="Account"><LuUserRound className="h-6 w-6 text-gray-800" /></button>
-          <button type="button" aria-label="Wishlist"><RiHeartLine className="h-6 w-6 text-gray-800" /></button>
+          {/* Mobile user dropdown (compact) */}
+          <UserMenu user={currentUser} compact />
+          {/* Mobile wishlist dropdown */}
+          <WishlistMenu />
           <button type="button" aria-label="Cart"><FiShoppingCart className="h-6 w-6 text-gray-800" /></button>
           <button type="button" aria-label="Search"><IoSearch className="h-6 w-6 text-gray-800" /></button>
         </div>
@@ -151,10 +383,10 @@ export default function Navbar() {
             mobileOpen ? "max-h-[800px] opacity-100" : "max-h-0 opacity-0"
           }`}
         >
-          <ul role="menu" className="px-6 pb-6 space-y-2">
+          <ul className="px-6 pb-6 space-y-2">
             {["Home","Shop","Categories","Blog","About","Contact","My Account","Cart","Checkout"].map((l) => (
               <li key={l}>
-                <a role="menuitem" href="#" className="block w-full rounded-md px-4 py-2 text-center text-gray-800 bg-white border border-neutral-200 hover:bg-neutral-50">
+                <a href="#" className="block w-full rounded-md px-4 py-2 text-center text-gray-800 bg-white border border-neutral-200 hover:bg-neutral-50">
                   {l}
                 </a>
               </li>

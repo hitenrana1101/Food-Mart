@@ -18,7 +18,7 @@ const CONFIGS = {
   },
 };
 
-// The backend for both these endpoints typically persists: id, brand, title, desc, img, visible
+// Default row with stock and storefront fields
 const newRow = () => ({
   id: crypto.randomUUID(),
   brand: "",
@@ -26,13 +26,12 @@ const newRow = () => ({
   desc: "",
   img: "",
   visible: true,
-  // local-only for preview order; backend for these datasets may ignore it
-  order: 9999,
-  // Extra UI fields to mirror storefront cards
+  order: 9999,     // local preview order
   unit: "1 UNIT",
   price: 18,
   rating: 4.5,
   discount: 0,
+  qty: 0,          // NEW: stock
 });
 
 const clamp = {
@@ -40,6 +39,7 @@ const clamp = {
   rating: (v) => Math.min(5, Math.max(0, Number.isFinite(+v) ? +v : 0)),
   discount: (v) => Math.min(99, Math.max(0, Number.isFinite(+v) ? Math.floor(+v) : 0)),
   order: (v, i) => Math.max(1, Number.isFinite(+v) ? Math.floor(+v) : i + 1),
+  qty: (v) => Math.max(0, Number.isFinite(+v) ? Math.floor(+v) : 0),
 };
 
 export default function AdminJustArrived() {
@@ -82,6 +82,7 @@ export default function AdminJustArrived() {
               rating: clamp.rating(r.rating),
               discount: clamp.discount(r.discount),
               order: clamp.order(r.order, i),
+              qty: clamp.qty(r.qty),
             })),
             loading: false,
           },
@@ -116,6 +117,7 @@ export default function AdminJustArrived() {
         if (key === "rating") return { ...r, rating: clamp.rating(val) };
         if (key === "discount") return { ...r, discount: clamp.discount(val) };
         if (key === "order") return { ...r, order: clamp.order(val, i) };
+        if (key === "qty") return { ...r, qty: clamp.qty(val) };
         return { ...r, [key]: val };
       })
     );
@@ -180,7 +182,7 @@ export default function AdminJustArrived() {
     setSaving(true);
     setMsg({ ok: "", err: "" });
     try {
-      // Persist full storefront-aligned fields; backend may ignore some per dataset
+      // Persist full storefront-aligned fields including stock (qty)
       const cleaned = rows.slice(0, CAP).map((r, i) => ({
         id: r.id,
         brand: String(r.brand || "").trim(),
@@ -193,6 +195,7 @@ export default function AdminJustArrived() {
         rating: clamp.rating(r.rating),
         discount: clamp.discount(r.discount),
         order: clamp.order(r.order, i),
+        qty: clamp.qty(r.qty),
       }));
       const payload = { title: String(title || cfg.titleDefault).trim(), cards: cleaned };
       const res = await fetch(cfg.put, {
@@ -213,8 +216,14 @@ export default function AdminJustArrived() {
 
   const countVisible = rows.filter((x) => x.visible).length;
 
+  // NEW: local order simulation (decrement preview stock by 1)
+  const orderOne = (id) =>
+    setRows((arr) =>
+      arr.map((r) => (r.id === id ? { ...r, qty: Math.max(0, clamp.qty((r.qty || 0) - 1)) } : r))
+    );
+
   return (
-    <main className="mx-auto max-w-[1472px] px-3 sm:px-4 py-6">
+    <main className="mx-auto max-w-[1300px] px-3 sm:px-4 py-6">
       {/* Tabs */}
       <div className="mb-4 flex items-center gap-6 text-sm">
         {["POPULAR", "JUST"].map((t) => (
@@ -290,8 +299,10 @@ export default function AdminJustArrived() {
       <div className="space-y-4">
         {/* Table */}
         <div className="overflow-hidden rounded border">
-          <div className="sticky top-0 grid items-center gap-2 border-b bg-neutral-50 px-2 py-2 text-[11px] font-medium text-neutral-700
-                          grid-cols-[34px_100px_1fr_1fr_1fr_90px_80px_80px_80px_70px_70px_90px]">
+          <div
+            className="sticky top-0 grid items-center gap-2 border-b bg-neutral-50 px-2 py-2 text-[11px] font-medium text-neutral-700
+                       grid-cols-[34px_100px_1fr_1fr_1fr_90px_80px_80px_80px_80px_70px_70px_90px]"
+          >
             <div>#</div>
             <div>Image</div>
             <div>Brand</div>
@@ -301,6 +312,7 @@ export default function AdminJustArrived() {
             <div>Price</div>
             <div>Rating</div>
             <div>Discount</div>
+            <div>Stock</div>{/* NEW */}
             <div>Visible</div>
             <div>Order</div>
             <div className="text-right pr-2">Actions</div>
@@ -320,7 +332,7 @@ export default function AdminJustArrived() {
                   onDragOver={onDragOver(r.id)}
                   onDrop={onDrop(r.id)}
                   className="grid items-center gap-2 px-2 py-2
-                             grid-cols-[34px_100px_1fr_1fr_1fr_90px_80px_80px_80px_70px_70px_90px]"
+                             grid-cols-[34px_100px_1fr_1fr_1fr_90px_80px_80px_80px_80px_70px_70px_90px]"
                 >
                   <div className="text-[11px] text-neutral-400">{idx + 1}</div>
 
@@ -396,6 +408,15 @@ export default function AdminJustArrived() {
                     className="rounded border px-2 py-1 text-xs"
                   />
 
+                  {/* NEW: Stock (qty) */}
+                  <input
+                    type="number"
+                    min={0}
+                    value={r.qty}
+                    onChange={(e) => setCell(r.id, "qty", e.target.value)}
+                    className="rounded border px-2 py-1 text-xs"
+                  />
+
                   <label className="flex items-center justify-center gap-2 text-xs">
                     <input
                       type="checkbox"
@@ -434,9 +455,7 @@ export default function AdminJustArrived() {
         <section className="rounded border p-3">
           <div className="mb-2 flex items-center justify-between">
             <h3 className="text-sm font-semibold">Preview</h3>
-            <span className="text-[11px] text-neutral-500">
-              Showing up to {CAP} visible items
-            </span>
+            <span className="text-[11px] text-neutral-500">Showing up to {CAP} visible items</span>
           </div>
           <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
             {rows
@@ -447,50 +466,85 @@ export default function AdminJustArrived() {
                   (a.order ?? 9999) - (b.order ?? 9999) ||
                   (a.title || "").localeCompare(b.title || "")
               )
-              .map((p) => (
-                <article
-                  key={p.id}
-                  className="relative rounded-2xl border border-neutral-200 bg-white shadow-sm transition duration-200 hover:shadow-2xl hover:-translate-y-0.5"
-                >
-                  {!!p.discount && (
-                    <span className="absolute left-4 top-4 rounded-md bg-green-100 text-green-700 text-xs font-semibold px-2 py-1">
-                      -{p.discount}%
-                    </span>
-                  )}
-                  <button
-                    type="button"
-                    className="absolute right-4 top-4 h-9 w-9 grid place-items-center rounded-full bg-white/90 ring-1 ring-neutral-200"
-                    title="Wishlist"
+              .map((p) => {
+                const isOOS = (Number(p.qty) || 0) <= 0;
+                return (
+                  <article
+                    key={p.id}
+                    className="relative rounded-2xl border border-neutral-200 bg-white shadow-sm transition duration-200 hover:shadow-2xl hover:-translate-y-0.5"
                   >
-                    <span className="text-xs">♡</span>
-                  </button>
-                  <div className="p-4">
-                    <div className="aspect-[4/3] w-full overflow-hidden rounded-xl bg-neutral-50 grid place-items-center">
-                      {/* eslint-disable-next-line */}
-                      {p.img ? (
-                        <img src={p.img} alt={p.title} className="h-full w-full object-contain" />
-                      ) : (
-                        <div className="text-[10px] text-neutral-400">No image</div>
-                      )}
+                    {!!p.discount && (
+                      <span className="absolute left-4 top-4 rounded-md bg-green-100 text-green-700 text-xs font-semibold px-2 py-1">
+                        -{p.discount}%
+                      </span>
+                    )}
+                    {isOOS && (
+                      <span className="absolute left-4 top-4 translate-y-8 rounded-md bg-rose-100 text-rose-700 text-xs font-semibold px-2 py-1">
+                        Out of Stock
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      className="absolute right-4 top-4 h-9 w-9 grid place-items-center rounded-full bg-white/90 ring-1 ring-neutral-200"
+                      title="Wishlist"
+                    >
+                      <span className="text-xs">♡</span>
+                    </button>
+
+                    <div className="p-4">
+                      <div className="aspect-[4/3] w-full overflow-hidden rounded-xl bg-neutral-50 grid place-items-center">
+                        {/* eslint-disable-next-line */}
+                        {p.img ? (
+                          <img src={p.img} alt={p.title} className="h-full w-full object-contain" />
+                        ) : (
+                          <div className="text-[10px] text-neutral-400">No image</div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  <div className="px-4 pb-4">
-                    <h3 className="text-sm text-neutral-500">{p.unit}</h3>
-                    <div className="mt-1 flex items-center gap-1">
-                      <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 fill-amber-400 stroke-amber-400">
-                        <path d="M12 .587l3.668 7.431L24 9.748l-6 5.848 1.417 8.263L12 19.771 4.583 23.86 6 15.596 0 9.748l8.332-1.73z" />
-                      </svg>
-                      <span className="text-xs font-medium text-neutral-600">{p.rating}</span>
+
+                    <div className="px-4 pb-4">
+                      <h3 className="text-sm text-neutral-500">{p.unit}</h3>
+                      <div className="mt-1 flex items-center gap-1">
+                        <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 fill-amber-400 stroke-amber-400">
+                          <path d="M12 .587l3.668 7.431L24 9.748l-6 5.848 1.417 8.263L12 19.771 4.583 23.86 6 15.596 0 9.748l8.332-1.73z" />
+                        </svg>
+                        <span className="text-xs font-medium text-neutral-600">{p.rating}</span>
+                      </div>
+                      <h2 className="mt-2 line-clamp-2 text-[15px] font-semibold text-neutral-900">
+                        {p.title || p.brand || "Untitled"}
+                      </h2>
+                      <div className="mt-2 text-[22px] font-semibold text-neutral-900">
+                        ${Number(p.price).toFixed(2)}
+                      </div>
+
+                      {/* NEW: Stock + Order button in preview */}
+                      <div className="mt-1 text-[12px]">
+                        {isOOS ? (
+                          <span className="text-rose-600 font-semibold">Out of Stock</span>
+                        ) : (
+                          <span className="text-neutral-500">{p.qty} in stock</span>
+                        )}
+                      </div>
+
+                      <div
+                       className="mt-3">
+                        <button
+                          type="button"
+                          onClick={() => orderOne(p.id)}
+                          disabled={isOOS}
+                          className="h-8 rounded-md border border-neutral-300 px-3 text-sm text-neutral-700 disabled:opacity-60"
+                          title={isOOS ? "Out of Stock" : "Order 1 (preview)"}
+                        >
+                          Order
+                        </button>
+                        <span className="ml-2 text-[11px] text-neutral-500">
+                          Preview only — click Save to persist
+                        </span>
+                      </div>
                     </div>
-                    <h2 className="mt-2 line-clamp-2 text-[15px] font-semibold text-neutral-900">
-                      {p.title || p.brand || "Untitled"}
-                    </h2>
-                    <div className="mt-2 text-[22px] font-semibold text-neutral-900">
-                      ${Number(p.price).toFixed(2)}
-                    </div>
-                  </div>
-                </article>
-              ))}
+                  </article>
+                );
+              })}
           </div>
         </section>
       </div>

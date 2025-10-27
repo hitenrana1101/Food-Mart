@@ -2,7 +2,34 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { Heart, Star, ChevronLeft, ChevronRight } from "lucide-react";
 
-// Normalize backend -> UI
+/* ===== Wishlist utils (localStorage + CustomEvent for same-tab) ===== */
+const WL_KEY = "wishlist";
+function wlRead() {
+  try { return JSON.parse(localStorage.getItem(WL_KEY) || "[]"); }
+  catch { return []; }
+}
+function wlWrite(next) {
+  localStorage.setItem(WL_KEY, JSON.stringify(next));
+  // same-tab instant update
+  window.dispatchEvent(new CustomEvent("wishlist-change", { detail: next }));
+}
+function wlAdd(item) {
+  const list = wlRead();
+  if (!list.some(p => p.id === item.id)) {
+    list.push({
+      id: item.id,
+      name: item.title,         // map title -> name
+      price: Number(item.price),
+      image: item.img           // map img -> image
+    });
+    wlWrite(list);
+  }
+}
+function wlRemove(id) {
+  wlWrite(wlRead().filter(p => p.id !== id));
+}
+
+/* ===== Normalize backend -> UI ===== */
 function adapt(cards) {
   const list = Array.isArray(cards) ? cards : [];
   return list
@@ -49,7 +76,6 @@ async function createOrder(payload) {
 }
 
 async function incrementBestSelling(productId, units) {
-  // Optional: ignore failures to keep UX smooth if this endpoint isn’t present
   try {
     const res = await fetch("/api/best-selling/order", {
       method: "POST",
@@ -64,7 +90,7 @@ async function incrementBestSelling(productId, units) {
   }
 }
 
-// NEW: check requested qty against stock without mutating inventory
+// Check requested qty against stock without mutating inventory
 async function checkBestSellingQty(productId, units) {
   try {
     const res = await fetch("/api/best-selling/check-qty", {
@@ -80,7 +106,6 @@ async function checkBestSellingQty(productId, units) {
       cappedQty: Number.isFinite(Number(data.cappedQty)) ? Number(data.cappedQty) : units,
     };
   } catch {
-    // If endpoint missing, fall back to no OOS flag so UX still works
     return { outOfStock: false, stock: 0, cappedQty: units };
   }
 }
@@ -140,7 +165,6 @@ function Card({ item, qty, onDec, onInc, onToggleWish, wished, onOrder, oos }) {
               –
             </button>
             <span className="min-w-[1.5rem] text-center text-sm font-medium">{qty}</span>
-            {/* IMPORTANT: allow increment even if stock is 0; OOS will be flagged */}
             <button
               type="button"
               onClick={onInc}
@@ -168,7 +192,11 @@ function Card({ item, qty, onDec, onInc, onToggleWish, wished, onOrder, oos }) {
 export default function BestSellingProducts() {
   const [items, setItems] = useState([]);
   const [qty, setQty] = useState({});
-  const [wish, setWish] = useState(() => new Set());
+  const [wish, setWish] = useState(() => {
+    // initialize from storage
+    const ids = new Set(wlRead().map(p => p.id));
+    return ids;
+  });
   const [oos, setOOS] = useState({}); // { [id]: boolean }
 
   const [canLeft, setCanLeft] = useState(false);
@@ -188,11 +216,16 @@ export default function BestSellingProducts() {
         setItems(data);
         const initialQty = Object.fromEntries(data.map((p) => [p.id, 1]));
         setQty(initialQty);
-        // Seed OOS based on stock for qty=1
-        const seededOOS = Object.fromEntries(
-          data.map((p) => [p.id, Number(p.qty) <= 0 ? true : false])
-        );
-        setOOS(seededOOS);
+        setOOS(Object.fromEntries(data.map((p) => [p.id, Number(p.qty) <= 0 ? true : false])));
+        // Sync wish against current list (optional)
+        setWish(prev => {
+          const current = new Set(prev);
+          const validIds = new Set(data.map(d => d.id));
+          for (const id of Array.from(current)) {
+            if (!validIds.has(id)) current.delete(id);
+          }
+          return current;
+        });
       } catch {
         if (!alive) return;
         setItems([]);
@@ -205,6 +238,30 @@ export default function BestSellingProducts() {
     return () => { alive = false; };
   }, []);
 
+  // Keep wish in sync with storage changes (cross-tab + same-tab)
+  useEffect(() => {
+    function onStorage(e) {
+      if (e.key === WL_KEY) {
+        try {
+          const list = JSON.parse(e.newValue || "[]") || [];
+          setWish(new Set(list.map(p => p.id)));
+        } catch {
+          setWish(new Set());
+        }
+      }
+    }
+    function onWishChange(e) {
+      const next = Array.isArray(e.detail) ? e.detail : wlRead();
+      setWish(new Set(next.map(p => p.id)));
+    }
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("wishlist-change", onWishChange);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("wishlist-change", onWishChange);
+    };
+  }, []);
+
   // Utilities
   const setQtyAndCheck = async (id, nextQty) => {
     setQty((q) => ({ ...q, [id]: nextQty }));
@@ -212,19 +269,23 @@ export default function BestSellingProducts() {
     setOOS((m) => ({ ...m, [id]: !!res.outOfStock }));
   };
 
-  const dec = (id) =>
-    setQtyAndCheck(id, Math.max(1, (qty[id] || 1) - 1));
+  const dec = (id) => setQtyAndCheck(id, Math.max(1, (qty[id] || 1) - 1));
+  const inc = (id) => setQtyAndCheck(id, (qty[id] || 1) + 1);
 
-  // IMPORTANT: remove stock clamp; allow increasing beyond stock
-  const inc = (id) =>
-    setQtyAndCheck(id, (qty[id] || 1) + 1);
-
-  const toggleWish = (id) =>
+  // Toggle wishlist with storage persistence
+  const toggleWish = (item) => {
     setWish((s) => {
       const n = new Set(s);
-      n.has(id) ? n.delete(id) : n.add(id);
+      if (n.has(item.id)) {
+        n.delete(item.id);
+        wlRemove(item.id);
+      } else {
+        n.add(item.id);
+        wlAdd(item);
+      }
       return n;
     });
+  };
 
   // Carousel helpers
   const getStep = useCallback((node) => {
@@ -304,7 +365,7 @@ export default function BestSellingProducts() {
       bc.onmessage = (ev) => {
         if (ev?.data?.type === "updated") reload();
       };
-    } catch {}
+    } catch { }
     const onStorage = (e) => {
       if (e.key === "best-selling-updated") reload();
     };
@@ -312,16 +373,13 @@ export default function BestSellingProducts() {
     return () => {
       alive = false;
       window.removeEventListener("storage", onStorage);
-      try {
-        bc && bc.close();
-      } catch {}
+      try { bc && bc.close(); } catch { }
     };
   }, []);
 
   const orderNow = async (item) => {
     const wanted = qty[item.id] ?? 1;
 
-    // First check against stock without mutating inventory
     const check = await checkBestSellingQty(item.id, wanted);
     if (check.outOfStock) {
       setOOS((m) => ({ ...m, [item.id]: true }));
@@ -329,7 +387,6 @@ export default function BestSellingProducts() {
     }
 
     try {
-      // Create an order like Trending
       const orderPayload = {
         id: crypto.randomUUID(),
         productId: item.id,
@@ -344,25 +401,21 @@ export default function BestSellingProducts() {
         createdAt: new Date().toISOString(),
       };
       const created = await createOrder(orderPayload);
-
-      // Optional: decrement stock server-side and increment orders counter
       const latestOrders = await incrementBestSelling(item.id, wanted);
 
-      // Update local UI (best effort)
       setItems((arr) =>
         arr.map((p) =>
           p.id === item.id
             ? {
-                ...p,
-                qty: Math.max(0, Number(p.qty || 0) - wanted),
-                orders:
-                  Number.isFinite(Number(latestOrders)) ? latestOrders : Number(p.orders || 0) + wanted,
-              }
+              ...p,
+              qty: Math.max(0, Number(p.qty || 0) - wanted),
+              orders:
+                Number.isFinite(Number(latestOrders)) ? latestOrders : Number(p.orders || 0) + wanted,
+            }
             : p
         )
       );
 
-      // Re-check after order
       const postCheck = await checkBestSellingQty(item.id, qty[item.id] ?? 1);
       setOOS((m) => ({ ...m, [item.id]: !!postCheck.outOfStock }));
 
@@ -456,7 +509,7 @@ export default function BestSellingProducts() {
                 qty={qty[item.id] ?? 1}
                 onDec={() => dec(item.id)}
                 onInc={() => inc(item.id)}
-                onToggleWish={() => toggleWish(item.id)}
+                onToggleWish={() => toggleWish(item)}   // pass full item here
                 wished={wish.has(item.id)}
                 onOrder={() => orderNow(item)}
                 oos={!!oos[item.id]}
