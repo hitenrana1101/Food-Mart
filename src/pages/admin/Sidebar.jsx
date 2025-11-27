@@ -19,15 +19,15 @@ const items = [
     label: "Home", base: "/home", icon: <FiHome />, subs: [
       { label: "Welcome Banner", to:"/admin/welcome" },
       { label: "Category", to: "/admin/category" },
-      { label: "Our Promises", to: "/admin/promises" },
-      { label: "Our Products", to: "/admin/products" },
+      { label: "Newly Arrived", to: "/admin/promises" },
+      { label: "Trending Products", to: "/admin/products" },
     ]
   },
   
   {
     label: "Products", base: "/about", icon: <FiInfo />, subs: [
       { label: "Best Selling", to: "/admin/selling" },
-      { label: "Just Arrived", to: "/admin/just" }, 
+      { label: "Popular + Just Arrived", to: "/admin/just" }, 
     ]
   },
 

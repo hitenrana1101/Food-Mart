@@ -1,31 +1,87 @@
-import React, { useEffect, useRef, useState, useId } from "react";
+// src/components/Navbar.jsx
+import React, { useEffect, useRef, useState, useId, useMemo, useContext, createContext } from "react";
 import { IoSearch } from "react-icons/io5";
 import { LuUserRound } from "react-icons/lu";
 import { RiHeartLine } from "react-icons/ri";
 import { FiShoppingCart } from "react-icons/fi";
 import logo from "../img/main_logo.png";
 
-/* User dropdown (disclosure pattern) */
+/* ---------------------------------------------
+   Wishlist context (global, persisted)
+   --------------------------------------------- */
+   
+const WishCtx = createContext(null);
+export function useWishlist() { return useContext(WishCtx); }
+
+function WishProvider({ children }) {
+  const [ids, setIds] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem("wish@ids") || "[]")); } catch { return new Set(); }
+  });
+  const [map, setMap] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("wish@items") || "{}"); } catch { return {}; }
+  });
+
+  useEffect(() => { try { localStorage.setItem("wish@ids", JSON.stringify(Array.from(ids))); } catch {} }, [ids]);
+  useEffect(() => { try { localStorage.setItem("wish@items", JSON.stringify(map)); } catch {} }, [map]);
+
+  const api = useMemo(() => ({
+    count: ids.size,
+    has: (id) => ids.has(id),
+    items: map, // { id: {id,title,img,price,unit} }
+    toggle(snap) {
+      setIds(prev => {
+        const n = new Set(prev);
+        if (n.has(snap.id)) {
+          n.delete(snap.id);
+          setMap(m => { const c = { ...m }; delete c[snap.id]; return c; });
+        } else {
+          n.add(snap.id);
+          setMap(m => ({ ...m, [snap.id]: {
+            id: snap.id,
+            title: snap.title || snap.name || "Untitled",
+            img: snap.img || snap.image || "",
+            price: Number.isFinite(+snap.price) ? +snap.price : 0,
+            unit: snap.unit || "1 UNIT",
+          }}));
+        }
+        return n;
+      });
+    },
+    remove(id) {
+      setIds(prev => { const n = new Set(prev); n.delete(id); return n; });
+      setMap(m => { const c = { ...m }; delete c[id]; return c; });
+    },
+    clear() { setIds(new Set()); setMap({}); }
+  }), [ids, map]);
+
+  // Listen to external likes (from product pages) via CustomEvent
+  useEffect(() => {
+    const onToggle = (e) => api.toggle(e.detail || {});
+    window.addEventListener("wishlist:toggle", onToggle);
+    return () => window.removeEventListener("wishlist:toggle", onToggle);
+  }, [api]);
+
+  return <WishCtx.Provider value={api}>{children}</WishCtx.Provider>;
+}
+
+/* Utility to dispatch from any card without importing context */
+export function dispatchWishlistToggle(snap) {
+  window.dispatchEvent(new CustomEvent("wishlist:toggle", { detail: snap }));
+}
+
+/* ---------------------------------------------
+   User dropdown (disclosure pattern)
+   --------------------------------------------- */
 function UserMenu({ user, compact = false }) {
   const [open, setOpen] = useState(false);
   const btnRef = useRef(null);
-  const panelRef = useRef(null);
   const rootRef = useRef(null);
   const uid = useId();
   const panelId = `user-menu-${uid}`;
 
   useEffect(() => {
-    function onKeyDown(e) {
-      if (e.key === "Escape") {
-        setOpen(false);
-        btnRef.current?.focus();
-      }
-    }
-    function onPointerDown(e) {
-      if (rootRef.current && !rootRef.current.contains(e.target)) {
-        setOpen(false);
-      }
-    }
+    function onKeyDown(e) { if (e.key === "Escape") { setOpen(false); btnRef.current?.focus(); } }
+    function onPointerDown(e) { if (rootRef.current && !rootRef.current.contains(e.target)) setOpen(false); }
     if (open) {
       document.addEventListener("keydown", onKeyDown);
       document.addEventListener("mousedown", onPointerDown);
@@ -59,17 +115,11 @@ function UserMenu({ user, compact = false }) {
 
       <div
         id={panelId}
-        ref={panelRef}
         hidden={!open}
-        className={[
-          "absolute z-50 w-72 rounded-xl border border-neutral-200 bg-white shadow-lg",
-          compact ? "right-0 mt-2" : "right-0 mt-2"
-        ].join(" ")}
+        className="absolute z-50 w-72 rounded-xl border border-neutral-200 bg-white shadow-lg right-0 mt-2"
       >
         <div className="p-4 flex items-center gap-3">
-          <div className="h-10 w-10 rounded-full bg-teal-600 text-white grid place-items-center font-semibold">
-            {initial}
-          </div>
+          <div className="h-10 w-10 rounded-full bg-teal-600 text-white grid place-items-center font-semibold">{initial}</div>
           <div className="min-w-0">
             <p className="text-sm font-medium text-gray-900 truncate">{user?.name || "Guest"}</p>
             <p className="text-xs text-gray-600 truncate">{user?.email || "guest@example.com"}</p>
@@ -83,10 +133,7 @@ function UserMenu({ user, compact = false }) {
         <div className="border-t border-neutral-200" />
         <button
           type="button"
-          onClick={() => {
-            setOpen(false);
-            // TODO: add your sign-out logic here
-          }}
+          onClick={() => { setOpen(false); /* sign out here */ }}
           className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-b-xl"
         >
           Logout
@@ -96,30 +143,21 @@ function UserMenu({ user, compact = false }) {
   );
 }
 
-/* Wishlist dropdown (disclosure pattern) */
+/* ---------------------------------------------
+   Wishlist dropdown (reads global store)
+   --------------------------------------------- */
 function WishlistMenu() {
+  const wish = useWishlist();
   const [open, setOpen] = useState(false);
-  const [items, setItems] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("wishlist") || "[]"); }
-    catch { return []; }
-  });
   const btnRef = useRef(null);
   const rootRef = useRef(null);
   const uid = useId();
   const panelId = `wishlist-panel-${uid}`;
+  const items = Object.values(wish.items);
 
   useEffect(() => {
-    function onKeyDown(e) {
-      if (e.key === "Escape") {
-        setOpen(false);
-        btnRef.current?.focus();
-      }
-    }
-    function onPointerDown(e) {
-      if (rootRef.current && !rootRef.current.contains(e.target)) {
-        setOpen(false);
-      }
-    }
+    function onKeyDown(e) { if (e.key === "Escape") { setOpen(false); btnRef.current?.focus(); } }
+    function onPointerDown(e) { if (rootRef.current && !rootRef.current.contains(e.target)) setOpen(false); }
     if (open) {
       document.addEventListener("keydown", onKeyDown);
       document.addEventListener("mousedown", onPointerDown);
@@ -132,28 +170,6 @@ function WishlistMenu() {
     };
   }, [open]);
 
-  useEffect(() => {
-    function onStorage(e) {
-      if (e.key === "wishlist") {
-        try { setItems(JSON.parse(e.newValue || "[]") || []); }
-        catch { setItems([]); }
-      }
-    }
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
-  }, []);
-
-  const count = items.length;
-  function write(next) {
-    localStorage.setItem("wishlist", JSON.stringify(next));
-    setItems(next);
-  }
-  function removeItem(id) {
-    write(items.filter(x => x.id !== id));
-  }
-  function clearAll() {
-    write([]);
-  }
   function handleAddToCart(item) {
     const ev = new CustomEvent("add-to-cart", { detail: item });
     window.dispatchEvent(ev);
@@ -171,9 +187,9 @@ function WishlistMenu() {
         className="relative w-10 h-10 p-2 flex items-center justify-center rounded-full bg-gray-50"
       >
         <RiHeartLine className="text-xl text-gray-700" />
-        {count > 0 && (
+        {wish.count > 0 && (
           <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-teal-600 text-white text-xs grid place-items-center">
-            {count}
+            {wish.count}
           </span>
         )}
         <span className="sr-only">Wishlist</span>
@@ -187,9 +203,7 @@ function WishlistMenu() {
         <div className="px-4 py-3 border-b border-neutral-200 flex items-center justify-between">
           <p className="text-sm font-semibold text-gray-900">Your Wishlist</p>
           {items.length > 0 && (
-            <button type="button" onClick={clearAll} className="text-xs text-red-600 hover:text-red-700">
-              Clear all
-            </button>
+            <button type="button" onClick={wish.clear} className="text-xs text-red-600 hover:text-red-700">Clear all</button>
           )}
         </div>
 
@@ -199,13 +213,9 @@ function WishlistMenu() {
           <ul className="divide-y divide-neutral-200">
             {items.map(item => (
               <li key={item.id} className="p-3 flex gap-3 items-center">
-                <img
-                  src={item.image}
-                  alt={item.name}
-                  className="h-14 w-14 rounded-md object-cover bg-neutral-100"
-                />
+                <img src={item.img} alt={item.title} className="h-14 w-14 rounded-md object-cover bg-neutral-100" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-gray-900 truncate">{item.name}</p>
+                  <p className="text-sm font-medium text-gray-900 truncate">{item.title}</p>
                   <p className="text-xs text-gray-600 truncate">
                     {typeof item.price === "number" ? `₹${item.price.toFixed(2)}` : item.price}
                   </p>
@@ -220,7 +230,7 @@ function WishlistMenu() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => removeItem(item.id)}
+                    onClick={() => wish.remove(item.id)}
                     className="px-2 py-1 text-xs rounded-md bg-neutral-100 text-gray-800 hover:bg-neutral-200"
                   >
                     Remove
@@ -235,7 +245,10 @@ function WishlistMenu() {
   );
 }
 
-export default function Navbar() {
+/* ---------------------------------------------
+   Navbar component
+   --------------------------------------------- */
+function NavbarInner() {
   const [isOpen, setIsOpen] = useState(false);        // desktop Pages
   const [mobileOpen, setMobileOpen] = useState(false); // mobile menu
   const currentUser = { name: "Hiten Rana", email: "hiten9968@gmail.com" };
@@ -294,7 +307,7 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* DESKTOP NAV (unchanged except code above) */}
+      {/* DESKTOP NAV */}
       <nav className="hidden lg:block">
         <div className="max-w-screen-2xl mx-auto px-4 py-2 flex mt-3 items-center space-x-8">
           <div className="relative">
@@ -349,9 +362,7 @@ export default function Navbar() {
       {/* MOBILE HEADER */}
       <div className="lg:hidden">
         <div className="flex items-center justify-center gap-6 py-3">
-          {/* Mobile user dropdown (compact) */}
-          <UserMenu user={currentUser} compact />
-          {/* Mobile wishlist dropdown */}
+          <UserMenu user={{ name: "Hiten Rana", email: "hiten9968@gmail.com" }} compact />
           <WishlistMenu />
           <button type="button" aria-label="Cart"><FiShoppingCart className="h-6 w-6 text-gray-800" /></button>
           <button type="button" aria-label="Search"><IoSearch className="h-6 w-6 text-gray-800" /></button>
@@ -379,9 +390,7 @@ export default function Navbar() {
 
         <nav
           id="mobile-menu-panel"
-          className={`mx-auto w-full max-w-sm overflow-hidden transition-[max-height,opacity] duration-300 ${
-            mobileOpen ? "max-h-[800px] opacity-100" : "max-h-0 opacity-0"
-          }`}
+          className={`mx-auto w-full max-w-sm overflow-hidden transition-[max-height,opacity] duration-300 ${mobileOpen ? "max-h-[800px] opacity-100" : "max-h-0 opacity-0"}`}
         >
           <ul className="px-6 pb-6 space-y-2">
             {["Home","Shop","Categories","Blog","About","Contact","My Account","Cart","Checkout"].map((l) => (
@@ -395,5 +404,14 @@ export default function Navbar() {
         </nav>
       </div>
     </header>
+  );
+}
+
+/* Export a Provider-wrapped Navbar so wishlist is available app-wide */
+export default function Navbar() {
+  return (
+    <WishProvider>
+      <NavbarInner />
+    </WishProvider>
   );
 }

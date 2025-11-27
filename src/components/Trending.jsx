@@ -1,6 +1,7 @@
 // src/pages/Trending.jsx
 import React, { useEffect, useMemo, useState } from "react";
 
+
 // Normalize backend -> UI
 function adapt(cards) {
   const list = Array.isArray(cards) ? cards : [];
@@ -65,9 +66,23 @@ export default function Trending() {
   const [title, setTitle] = useState("Trending Products");
   const [items, setItems] = useState([]);
   const [qtyMap, setQtyMap] = useState({});
-  const [wish, setWish] = useState(() => new Set());
+  const [wish, setWish] = useState(() => {
+    try {
+      const raw = localStorage.getItem("wish@trending");
+      return raw ? new Set(JSON.parse(raw)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+
+  // Persist wishlist
+  useEffect(() => {
+    try {
+      localStorage.setItem("wish@trending", JSON.stringify(Array.from(wish)));
+    } catch {}
+  }, [wish]);
 
   // Per-item out-of-stock map (true when requested qty > stock or stock<=0)
   const [oos, setOOS] = useState({});
@@ -123,7 +138,6 @@ export default function Trending() {
   };
 
   const dec = (id) => setQtyAndCheck(id, Math.max(1, (qtyMap[id] || 1) - 1));
-
   // IMPORTANT: remove stock clamp; allow increasing beyond stock
   const inc = (id) => setQtyAndCheck(id, (qtyMap[id] || 1) + 1);
 
@@ -211,19 +225,33 @@ export default function Trending() {
                       Out of Stock
                     </span>
                   )}
+
+                  {/* Wishlist button fixed */}
                   <button
-                    onClick={() => toggleWish(item.id)}
-                    className="absolute right-4 top-4 h-10 w-10 grid place-items-center rounded-full bg-white/90 ring-1 ring-neutral-200 hover:bg-white"
-                    aria-label="Add to wishlist"
                     type="button"
+                    aria-label={wish.has(item.id) ? "Remove from wishlist" : "Add to wishlist"}
+                    aria-pressed={wish.has(item.id)}
+                    onClick={(e) => { e.stopPropagation(); toggleWish(item.id); }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        toggleWish(item.id);
+                      }
+                    }}
+                    className="absolute right-4 top-4 z-10 h-10 w-10 grid place-items-center rounded-full bg-white/90 ring-1 ring-neutral-200 hover:bg-white cursor-pointer"
                   >
-                    <svg
-                      viewBox="0 0 24 24"
-                      className={wish.has(item.id) ? "h-4 w-4 fill-rose-500 stroke-rose-500" : "h-4 w-4 stroke-neutral-700"}
-                    >
-                      <path d="M12 21s-7.434-4.42-9.428-8.54C1.57 9.68 3.26 6.5 6.6 6.5c2.04 0 3.07 1.06 3.9 2.18.83-1.12 1.86-2.18 3.9-2.18 3.34 0 5.03 3.18 4.03 5.96C19.434 16.58 12 21 12 21z" />
-                    </svg>
+                    {wish.has(item.id) ? (
+                      <svg viewBox="0 0 24 24" className="h-4 w-4 fill-rose-500 stroke-rose-500">
+                        <path d="M12 21s-7.434-4.42-9.428-8.54C1.57 9.68 3.26 6.5 6.6 6.5c2.04 0 3.07 1.06 3.9 2.18.83-1.12 1.86-2.18 3.9-2.18 3.34 0 5.03 3.18 4.03 5.96C19.434 16.58 12 21 12 21z" />
+                      </svg>
+                    ) : (
+                      <svg viewBox="0 0 24 24" className="h-4 w-4 stroke-neutral-700">
+                        <path fill="none" strokeWidth="1.5" d="M12 21s-7.434-4.42-9.428-8.54C1.57 9.68 3.26 6.5 6.6 6.5c2.04 0 3.07 1.06 3.9 2.18.83-1.12 1.86-2.18 3.9-2.18 3.34 0 5.03 3.18 4.03 5.96C19.434 16.58 12 21 12 21z" />
+                      </svg>
+                    )}
                   </button>
+
                   <div className="aspect-[4/3] w-full rounded-xl bg-neutral-50 overflow-hidden grid place-items-center">
                     {/* eslint-disable-next-line */}
                     <img

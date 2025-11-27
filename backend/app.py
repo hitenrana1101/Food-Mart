@@ -4,6 +4,7 @@ from datetime import datetime
 from flask import Flask, request, jsonify, make_response, send_from_directory
 from werkzeug.utils import secure_filename
 from flask_sqlalchemy import SQLAlchemy
+from flask_cors import CORS
 
 # ---- Paths ----
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -24,13 +25,15 @@ ORDERS_JSON = os.path.join(DATA_DIR, "orders.json")
 # ---- Flask + DB ----
 app = Flask(__name__)
 DB_PATH = os.path.join(DATA_DIR, "data.db")
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///" + DB_PATH  # Absolute path ensures file at data/data.db
+app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///" + DB_PATH
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024  # 5MB
+
 db = SQLAlchemy(app)
+CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 # Constants
-CAP = 8
+CAP = 10
 ALLOWED_EXTS = {"png", "jpg", "jpeg", "gif", "webp"}
 
 def no_store(resp):
@@ -97,7 +100,7 @@ def atomic_write_json(path: str, content: dict | list):
     os.replace(tmp, path)
 
 # ===================== MODELS =====================
-# POPULAR / JUST (generic)
+# POPULAR / JUST
 class Section(db.Model):
     __tablename__ = "sections"
     key = db.Column(db.String(16), primary_key=True)  # "POPULAR" or "JUST"
@@ -229,7 +232,7 @@ class BestSellingItem(db.Model):
             "img": self.img or "",
             "visible": bool(self.visible),
             "category": self.category or "FRUITS & VEGES",
-            "price": float(self.price or 0),
+            "price": float(self.price or 0),    
             "unit": self.unit or "1 UNIT",
             "rating": float(self.rating or 0),
             "discount": int(self.discount or 0),
@@ -319,6 +322,31 @@ class Order(db.Model):
     discount = db.Column(db.Integer, default=0)
     createdAt = db.Column(db.String(64), default=lambda: datetime.utcnow().isoformat()+"Z")
 
+# WISHLIST
+class Wishlist(db.Model):
+    __tablename__ = "wishlist"
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    user_id = db.Column(db.String(64), index=True, nullable=False)   # demo: header X-User-Id
+    product_id = db.Column(db.String(64), index=True, nullable=False)
+    title = db.Column(db.String(255), default="")
+    img = db.Column(db.String(2000), default="")
+    price = db.Column(db.Float, default=0.0)
+    unit = db.Column(db.String(64), default="1 UNIT")
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (db.UniqueConstraint("user_id", "product_id", name="uq_wish_user_product"),)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "productId": self.product_id,
+            "title": self.title,
+            "img": self.img,
+            "price": float(self.price or 0),
+            "unit": self.unit or "1 UNIT",
+            "createdAt": (self.created_at or datetime.utcnow()).isoformat() + "Z",
+        }
+
 # ===================== POPULAR / JUST ROUTES =====================
 def ensure_section(key: str, default_title: str):
     sec = Section.query.get(key)
@@ -363,7 +391,6 @@ def save_section(key: str, default_title: str, body: dict):
         item.qty = clamp_qty(r.get("qty"))
         db.session.add(item)
 
-    # delete removed rows from this section
     q = SectionItem.query.filter(SectionItem.section_key == key)
     if keep_ids:
         q = q.filter(~SectionItem.id.in_(list(keep_ids)))
@@ -401,7 +428,7 @@ def put_just_arrived_db():
         db.session.rollback()
         return jsonify({"error": str(e)}), 400
 
-# ===================== TRENDING ROUTES (DB) =====================
+# ===================== TRENDING (DB) =====================
 def ensure_trending_section():
     sec = TrendingSection.query.first()
     if not sec:
@@ -509,7 +536,7 @@ def post_trending_check_qty():
     }
     return no_store(make_response(jsonify(out), 200))
 
-# ===================== BEST SELLING ROUTES (DB) =====================
+# ===================== BEST SELLING (DB) =====================
 def ensure_best_section():
     sec = BestSellingSection.query.first()
     if not sec:
@@ -551,7 +578,6 @@ def save_best_db(body: dict):
         item.discount = clamp_discount(c.get("discount"))
         item.order = clamp_order(c.get("order"), i)
         item.qty = clamp_qty(c.get("qty"))
-        # preserve running orders if not sent
         item.orders = clamp_qty(c.get("orders") if c.get("orders") is not None else item.orders)
         db.session.add(item)
     q = BestSellingItem.query.filter(BestSellingItem.section_id == sec.id)
@@ -622,7 +648,7 @@ def post_best_selling_check_qty():
     }
     return no_store(make_response(jsonify(out), 200))
 
-# ===================== NEW ARRIVED ROUTES (DB) =====================
+# ===================== NEW ARRIVED (DB) =====================
 def ensure_new_arrived_section():
     sec = NewArrivedSection.query.first()
     if not sec:
@@ -639,7 +665,6 @@ def new_arrived_payload():
         .limit(CAP)
         .all()
     )
-    # Keep payload shape minimal as before (no CAP text needed)
     return {"title": sec.title, "cards": [x.to_dict() for x in items]}
 
 def save_new_arrived_db(body: dict):
@@ -747,53 +772,62 @@ def put_blogs():
     except Exception as e:
         return no_store(make_response(jsonify({"error": str(e) or "Save failed"}), 400))
 
-# ===================== ORDERS (DB) =====================
-@app.post("/api/orders")
-def create_order():
-    data = request.get_json(silent=True)
-    if data is None:
-        return no_store(make_response(jsonify({"error": "Invalid or missing JSON; set Content-Type: application/json"}), 400))
-    try:
-        o = Order(
-            id = data.get("id") or uuid.uuid4().hex,
-            productId = s(data.get("productId")),
-            title = s(data.get("title")),
-            brand = s(data.get("brand")),
-            unit = s(data.get("unit")),
-            price = clamp_price(data.get("price")),
-            qty = clamp_qty(data.get("qty") or 1),
-            subtotal = clamp_price(data.get("subtotal")),
-            category = s(data.get("category")),
-            discount = clamp_discount(data.get("discount")),
-            createdAt = data.get("createdAt") or datetime.utcnow().isoformat() + "Z",
-        )
-        if not o.productId:
-            return no_store(make_response(jsonify({"error": "productId is required"}), 400))
-        db.session.add(o)
+# ===================== WISHLIST ROUTES =====================
+def current_user_id():
+    uid = (request.headers.get("X-User-Id") or "guest").strip()
+    return uid or "guest"
+
+@app.get("/api/wishlist")
+def get_wishlist():
+    uid = current_user_id()
+    rows = Wishlist.query.filter_by(user_id=uid).order_by(Wishlist.id.desc()).limit(200).all()
+    return no_store(make_response(jsonify({"items": [r.to_dict() for r in rows]}), 200))
+
+@app.post("/api/wishlist/toggle")
+def toggle_wishlist():
+    uid = current_user_id()
+    data = request.get_json(silent=True) or {}
+    pid = s(data.get("id") or data.get("productId"))
+    if not pid:
+        return no_store(make_response(jsonify({"error": "product id required"}), 400))
+    row = Wishlist.query.filter_by(user_id=uid, product_id=pid).first()
+    if row:
+        db.session.delete(row)
         db.session.commit()
-        resp = make_response(jsonify({
-            "id": o.id, "productId": o.productId, "title": o.title, "brand": o.brand, "unit": o.unit,
-            "price": o.price, "qty": o.qty, "subtotal": o.subtotal, "category": o.category,
-            "discount": o.discount, "createdAt": o.createdAt
-        }), 201)
-        resp.headers["Location"] = f"/api/orders/{o.id}"
-        return no_store(resp)
+        return no_store(make_response(jsonify({"ok": True, "removed": True, "productId": pid}), 200))
+    snap = {
+        "title": s(data.get("title") or data.get("name")),
+        "img": s(data.get("img") or data.get("image")),
+        "price": clamp_price(data.get("price")),
+        "unit": s(data.get("unit"), "1 UNIT"),
+    }
+    row = Wishlist(user_id=uid, product_id=pid, **snap)
+    db.session.add(row)
+    try:
+        db.session.commit()
     except Exception as e:
         db.session.rollback()
-        return no_store(make_response(jsonify({"error": str(e) or "Order failed"}), 400))
+        return no_store(make_response(jsonify({"error": "toggle failed", "detail": str(e)}), 400))
+    return no_store(make_response(jsonify({"ok": True, "added": True, "item": row.to_dict()}), 200))
 
-@app.get("/api/orders/<order_id>")
-def get_order(order_id):
-    o = Order.query.get(order_id)
-    if not o:
+@app.delete("/api/wishlist/<product_id>")
+def delete_wishlist_item(product_id):
+    uid = current_user_id()
+    row = Wishlist.query.filter_by(user_id=uid, product_id=str(product_id)).first()
+    if not row:
         return no_store(make_response(jsonify({"error": "Not found"}), 404))
-    return no_store(make_response(jsonify({
-        "id": o.id, "productId": o.productId, "title": o.title, "brand": o.brand, "unit": o.unit,
-        "price": o.price, "qty": o.qty, "subtotal": o.subtotal, "category": o.category,
-        "discount": o.discount, "createdAt": o.createdAt
-    }), 200))
+    db.session.delete(row)
+    db.session.commit()
+    return no_store(make_response(jsonify({"ok": True, "removed": True, "productId": str(product_id)}), 200))
 
-# ===================== Uploads (unchanged paths) =====================
+@app.delete("/api/wishlist")
+def clear_wishlist():
+    uid = current_user_id()
+    Wishlist.query.filter_by(user_id=uid).delete(synchronize_session=False)
+    db.session.commit()
+    return no_store(make_response(jsonify({"ok": True}), 200))
+
+# ===================== Uploads =====================
 @app.post("/api/upload-image")
 def upload_image():
     f = request.files.get("image")
@@ -813,7 +847,6 @@ def serve_upload(filename):
 
 # ===================== Migration (JSON -> DB one-time) =====================
 def migrate_section_json_to_db(key: str, json_path: str, default_title: str):
-    # only if no items present
     if SectionItem.query.filter_by(section_key=key).count() > 0:
         return
     base = load_json(json_path, default_title)
@@ -872,14 +905,13 @@ def migrate_blogs_json_to_db():
 # ---- Boot ----
 if __name__ == "__main__":
     with app.app_context():
-        db.create_all()  # creates all tables in SQLite (data/data.db)
+        db.create_all()
         ensure_section("POPULAR", "Most popular products")
         ensure_section("JUST", "Just arrived")
         ensure_trending_section()
         ensure_best_section()
         ensure_new_arrived_section()
         ensure_blogs_section()
-        # One-time migrations from JSON if DB empty
         migrate_section_json_to_db("POPULAR", POPULAR_JSON, "Most popular products")
         migrate_section_json_to_db("JUST", JUST_ARRIVED_JSON, "Just arrived")
         migrate_trending_json_to_db()

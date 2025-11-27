@@ -186,10 +186,10 @@ export default function AdminJustArrived() {
 
   return (
     <main className="mx-auto max-w-[1472px] px-3 sm:px-4 py-5">
-      <title>Food Mart Just Arrived</title>
+      <title>Food Mart Best Selling</title>
 
       <div className="mb-3 flex items-center justify-between">
-        <h1 className="text-[15px] font-semibold">{title}</h1>
+        <h1 className="text-[15px] font-semibold">Best Selling Products</h1>
         <div className="flex items-center gap-2">
           <span className="rounded bg-neutral-100 px-2 py-1 text-[11px] text-neutral-600">
             {counts.all}/{CAP} items • {counts.vis} visible • {counts.oos} OOS
